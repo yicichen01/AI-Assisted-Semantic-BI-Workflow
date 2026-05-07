@@ -1,3 +1,12 @@
+"""
+End-to-end orchestration layer for the Semantic BI Workflow.
+
+Responsibilities:
+- Run the full pipeline from field profiling to promotion decisions
+- Coordinate semantic setup, candidate question generation, scoring, and validation
+- Return structured workflow outputs for Streamlit display and downstream review
+"""
+
 from typing import Any, Dict, List
 
 import pandas as pd
