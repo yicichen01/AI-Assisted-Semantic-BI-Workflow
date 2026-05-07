@@ -1,6 +1,6 @@
-# AI-assited Semantic BI Workflow
+# AI-Assited Semantic BI Workflow
 
-AI-assited Semantic BI Workflow is a **GenAI-powered BI prototype** that helps automate semantic setup, candidate verified-question generation, and question quality validation in **natural-language analytics** for better **self-service BI.**
+AI-Assited Semantic BI Workflow is a **GenAI-powered BI prototype** that helps automate semantic setup, candidate verified-question generation, and question quality validation in **natural-language analytics** for better **self-service BI.**
 
 ## Live Demo
 
@@ -12,19 +12,19 @@ AI-assited Semantic BI Workflow is a **GenAI-powered BI prototype** that helps a
 
 ### Streamlit MVP
 
-![Streamlit MVP](assets/workflow_summary.png)
+![Streamlit MVP](assets/screenshots/workflow_summary.png)
 
 ### Semantic Setup and Question Validation
 
-![Semantic Setup](assets/semantic_setup.png)
+![Semantic Setup](assets/screenshots/semantic_setup.png)
 
 ### Candidate Verified Questions
 
-![Candidate Questions](assets/candidate_questions.png)
+![Candidate Questions](assets/screenshots/candidate_questions.png)
 
 ### Promotion Decision
 
-![Promotion Decision](assets/scoring_promotion.png)
+![Promotion Decision](assets/screenshots/scoring_promotion.png)
 
 ---
 
