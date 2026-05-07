@@ -1,3 +1,12 @@
+"""
+Promotion rules for candidate BI question validation.
+
+Responsibilities:
+- Apply final threshold-based promotion logic to scored candidate questions
+- Convert validation scores, deal breakers, and ambiguity flags into Verified / Review / Reject decisions
+- Generate actionable review reasons and suggested fixes for BI owners
+"""
+
 from typing import List, Tuple
 
 from src.schemas import QuestionScore, ValidationStatus
