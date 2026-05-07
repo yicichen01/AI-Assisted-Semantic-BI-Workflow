@@ -1,3 +1,14 @@
+"""
+Candidate question scoring module for the Semantic BI Workflow.
+
+Responsibilities:
+- Score generated BI questions across multiple validation dimensions
+- Check grounding against the metric registry and semantic layer
+- Identify deal breakers, easy-to-fix issues, and ambiguity flags
+- Return structured scores and rationale for downstream promotion decisions
+- Provide a placeholder for future LLM-based question scoring
+"""
+
 from typing import Any, Dict, List, Optional, Set, Tuple
 
 from .schemas import QuestionCandidate, FieldSuggestion, QuestionScore, ValidationStatus
