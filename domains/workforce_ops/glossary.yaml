@@ -1,0 +1,94 @@
+utilization_rate:
+  - utilization
+  - capacity usage
+  - workload ratio
+  - active workload
+  - resource utilization
+
+late_rate:
+  - tardiness rate
+  - delayed start rate
+  - not-on-time rate
+  - punctuality issue rate
+  - late start percentage
+
+avg_adherence_minutes:
+  - average delay minutes
+  - schedule adherence
+  - start time variance
+  - start delay
+  - adherence gap
+
+adherence_minutes:
+  - delay minutes
+  - schedule adherence minutes
+  - start time difference
+  - start variance
+
+completion_rate:
+  - task completion ratio
+  - completion percentage
+  - work completion rate
+  - productivity completion rate
+
+total_tasks:
+  - assigned tasks
+  - task volume
+  - workload volume
+  - total workload
+
+completed_tasks:
+  - finished tasks
+  - completed workload
+  - task completions
+  - completed volume
+
+record_date:
+  - business date
+  - reporting date
+  - operation date
+  - activity date
+
+region:
+  - business region
+  - operating region
+  - geography
+
+site:
+  - location
+  - facility
+  - station
+  - warehouse site
+
+team:
+  - function
+  - work group
+  - operating team
+
+manager_name:
+  - manager
+  - supervisor
+  - team lead
+
+shift:
+  - work shift
+  - schedule block
+  - time block
+  - shift period
+
+tenure_band:
+  - tenure group
+  - experience band
+  - employee tenure
+  - tenure segment
+
+cohort:
+  - employee group
+  - population group
+  - workforce segment
+  - associate cohort
+
+is_late:
+  - late flag
+  - late start indicator
+  - tardiness indicator

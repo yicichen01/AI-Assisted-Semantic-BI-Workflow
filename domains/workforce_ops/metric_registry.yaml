@@ -1,0 +1,90 @@
+utilization_rate:
+  description: Average utilization rate across sites, teams, shifts, and time periods.
+  dependent_fields:
+    - utilization_rate
+  preferred_aggregation: avg
+  allowed_dimensions:
+    - record_date
+    - region
+    - site
+    - team
+    - manager_name
+    - shift
+    - tenure_band
+    - cohort
+
+late_rate:
+  description: Share of records where employees started later than scheduled.
+  dependent_fields:
+    - is_late
+  preferred_aggregation: avg
+  allowed_dimensions:
+    - record_date
+    - region
+    - site
+    - team
+    - manager_name
+    - shift
+    - tenure_band
+    - cohort
+
+avg_adherence_minutes:
+  description: Average difference in minutes between scheduled start time and actual start time.
+  dependent_fields:
+    - adherence_minutes
+  preferred_aggregation: avg
+  allowed_dimensions:
+    - record_date
+    - region
+    - site
+    - team
+    - manager_name
+    - shift
+    - tenure_band
+    - cohort
+
+completion_rate:
+  description: Ratio of completed tasks to total assigned tasks.
+  dependent_fields:
+    - completed_tasks
+    - total_tasks
+  preferred_aggregation: ratio
+  allowed_dimensions:
+    - record_date
+    - region
+    - site
+    - team
+    - manager_name
+    - shift
+    - tenure_band
+    - cohort
+
+total_tasks:
+  description: Total number of assigned tasks.
+  dependent_fields:
+    - total_tasks
+  preferred_aggregation: sum
+  allowed_dimensions:
+    - record_date
+    - region
+    - site
+    - team
+    - manager_name
+    - shift
+    - tenure_band
+    - cohort
+
+completed_tasks:
+  description: Total number of completed tasks.
+  dependent_fields:
+    - completed_tasks
+  preferred_aggregation: sum
+  allowed_dimensions:
+    - record_date
+    - region
+    - site
+    - team
+    - manager_name
+    - shift
+    - tenure_band
+    - cohort

@@ -1,0 +1,26 @@
+# Semantic BI Workflow Configuration
+
+app:
+  name: "Semantic BI Workflow"
+  version: "0.1.0"
+  debug: false
+
+agents:
+  semantic:
+    model: "gpt-4"
+    temperature: 0.3
+  question:
+    model: "gpt-4"
+    temperature: 0.2
+
+validation:
+  strict_mode: true
+  require_semantic_mapping: true
+  check_data_quality: true
+
+logging:
+  level: "INFO"
+  format: "json"
+
+# Domain-specific configurations
+domains: {}
