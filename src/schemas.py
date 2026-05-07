@@ -1,4 +1,12 @@
+"""
+Shared Pydantic schemas for the Semantic BI Workflow.
 
+Responsibilities:
+- Define typed data contracts across pipeline modules
+- Standardize field profiles, semantic suggestions, candidate questions, and scoring outputs
+- Support structured validation for heuristic agents and future LLM-based modules
+- Keep workflow outputs consistent for Streamlit display and downstream review
+"""
 
 from pydantic import BaseModel
 from typing import List, Optional, Dict, Union
