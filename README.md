@@ -124,8 +124,6 @@ Example field roles include:
 
 This helps identify which fields are useful for natural-language BI and which fields should not be exposed directly to business users.
 
----
-
 ### Semantic Setup Suggestions
 
 The system suggests BI-ready metadata for each field, including:
@@ -137,8 +135,6 @@ The system suggests BI-ready metadata for each field, including:
 - Review notes
 
 For example, a field like `employee_id` may be excluded from user-facing Q&A, while a field like `net_sales` may be included with synonyms such as `revenue`, `sales`, and `sales amount`.
-
----
 
 ### Candidate Verified Questions
 
@@ -162,11 +158,9 @@ Decision: Candidate for validation
 
 This simulates the manual verified-question setup process used in natural-language BI tools, but makes it faster and easier to review.
 
----
-
 ### Question Validation and Promotion Decision
 
-The question validation design was inspired by the modularized evaluation framework from the Microsoft paper *Optimizing Prompt Refinement: Algorithmic Strategies for Large Language Model-based Text Classification*. The paper proposes breaking a complex classification task into separate evaluation categories, scoring each category independently, and then combining the scores with rule-based thresholds and deal-breaker logic for a final decision.
+The question validation design was inspired by the modularized evaluation framework proposed by Ao, Singh, and Antinome (2026) in *Optimizing Prompt Refinement: Algorithmic Strategies for Large Language Model-based Text Classification*. The paper proposes breaking a complex classification task into separate evaluation categories, scoring each category independently, and then combining the scores with rule-based thresholds and deal-breaker logic for a final decision.
 
 In this project, I adapted that modularized approach from exam-question quality classification to BI question validation. Instead of evaluating exam questions by accuracy, clarity, complexity, format, and relevancy, this workflow evaluates candidate BI questions across five BI-focused dimensions:
 
@@ -201,8 +195,6 @@ The current MVP uses a Pydantic-based heuristic agent.
 Pydantic schemas define structured inputs and outputs, which makes the pipeline more stable, easier to validate, and easier to extend. The current version uses rule-based logic instead of live LLM calls, so the workflow is transparent and easier to debug.
 
 This design also prepares the project for future LLM integration because model outputs can be constrained by predefined schemas.
-
----
 
 ### YAML Metric Registry and Glossary
 
@@ -262,3 +254,8 @@ It combines:
 - Config-driven pipeline design
 - AI-assisted workflow automation
 
+---
+
+### Reference
+
+Ao, Z., Singh, J., & Antinome, S. (2026). *[Optimizing Prompt Refinement: Algorithmic Strategies for Large Language Model-based Text Classification](https://www.ijcaonline.org/archives/volume187/number78/optimizing-prompt-refinement-algorithmic-strategies-for-large-language-model-based-text-classification/).* International Journal of Computer Applications, 187(78).
