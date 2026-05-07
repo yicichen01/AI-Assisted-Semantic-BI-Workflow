@@ -1,3 +1,13 @@
+"""
+Candidate question generation module for the Semantic BI Workflow.
+
+Responsibilities:
+- Generate realistic manager-style BI questions from semantic field suggestions
+- Use approved metrics, business dimensions, date fields, and seed questions as context
+- Deduplicate generated questions and avoid returning exact seed questions
+- Provide a placeholder for future LLM-based question generation
+"""
+
 from typing import List, Dict, Any, Optional
 from .schemas import FieldSuggestion, QuestionCandidate
 
