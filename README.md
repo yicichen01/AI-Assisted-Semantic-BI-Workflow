@@ -4,7 +4,7 @@ AI-Assited Semantic BI Workflow is a **GenAI-powered BI prototype** that helps a
 
 ## Live Demo
 
-**[Try the Streamlit MVP here](STREAMLIT_APP_LINK_HERE)**
+**[Try the Streamlit MVP here](https://semantic-bi-workflow.streamlit.app/)**
 
 ---
 
