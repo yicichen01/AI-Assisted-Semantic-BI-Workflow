@@ -1,0 +1,24 @@
+metrics:
+  - name: net_sales
+    definition: Gross sales minus discounts and returns.
+    business_owner: Retail BI Team
+
+  - name: gross_sales
+    definition: Total sales amount before discounts and returns.
+    business_owner: Retail BI Team
+
+  - name: profit
+    definition: Net sales minus product cost.
+    business_owner: Retail BI Team
+
+  - name: units_sold
+    definition: Total quantity of products sold.
+    business_owner: Retail BI Team
+
+  - name: average_order_value
+    definition: Net sales divided by total number of orders.
+    business_owner: Retail BI Team
+
+  - name: return_rate
+    definition: Returned units divided by units sold.
+    business_owner: Retail BI Team

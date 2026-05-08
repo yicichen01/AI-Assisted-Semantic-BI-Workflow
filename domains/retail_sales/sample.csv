@@ -1,0 +1,11 @@
+order_id,order_date,store,region,product_category,net_sales,gross_sales,discount_amount,product_cost,profit,units_sold,returned_units,average_order_value,return_rate
+O001,2026-01-05,Seattle Downtown,West,Outerwear,420,460,40,260,160,4,0,105,0.00
+O002,2026-01-08,Bellevue Square,West,Footwear,310,350,40,190,120,3,0,103.33,0.00
+O003,2026-01-12,Chicago Loop,Midwest,Accessories,180,200,20,95,85,5,1,36,0.20
+O004,2026-01-15,New York Soho,East,Dresses,520,580,60,330,190,4,0,130,0.00
+O005,2026-01-18,Austin Domain,South,Denim,260,300,40,155,105,2,0,130,0.00
+O006,2026-02-03,Seattle Downtown,West,Footwear,390,430,40,240,150,3,0,130,0.00
+O007,2026-02-09,Bellevue Square,West,Outerwear,610,680,70,410,200,5,1,122,0.20
+O008,2026-02-14,Chicago Loop,Midwest,Dresses,340,380,40,210,130,2,0,170,0.00
+O009,2026-02-20,New York Soho,East,Accessories,220,250,30,120,100,6,0,36.67,0.00
+O010,2026-02-26,Austin Domain,South,Denim,300,340,40,180,120,3,1,100,0.33

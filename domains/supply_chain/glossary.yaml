@@ -1,0 +1,64 @@
+order_volume:
+  - orders
+  - order count
+  - demand volume
+
+shipped_units:
+  - units shipped
+  - shipped volume
+  - shipment units
+
+on_time_shipments:
+  - on-time delivery
+  - on-time shipments
+  - SLA-met shipments
+
+late_shipments:
+  - delayed shipments
+  - late deliveries
+  - missed SLA shipments
+
+average_delivery_days:
+  - delivery speed
+  - average delivery time
+  - transit time
+
+delivery_cost:
+  - shipping cost
+  - carrier cost
+  - logistics cost
+
+fulfillment_cost:
+  - warehouse cost
+  - handling cost
+  - pick pack cost
+
+damage_rate:
+  - damaged shipment rate
+  - damage percentage
+  - defect rate
+
+stockout_rate:
+  - out-of-stock rate
+  - inventory shortage rate
+  - stock availability issue
+
+warehouse:
+  - fulfillment center
+  - FC
+  - distribution center
+
+carrier:
+  - logistics provider
+  - shipping partner
+  - delivery provider
+
+region:
+  - market
+  - area
+  - geography
+
+product_category:
+  - category
+  - product group
+  - merchandise category

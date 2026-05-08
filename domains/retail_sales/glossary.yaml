@@ -1,0 +1,45 @@
+net_sales:
+  - revenue
+  - sales
+  - sales amount
+  - net revenue
+
+gross_sales:
+  - total sales
+  - gross revenue
+  - sales before discount
+
+profit:
+  - margin
+  - gross profit
+  - contribution
+
+units_sold:
+  - quantity sold
+  - items sold
+  - unit volume
+
+average_order_value:
+  - AOV
+  - average basket size
+  - average order amount
+
+return_rate:
+  - return percentage
+  - refund rate
+  - returned item rate
+
+store:
+  - retail location
+  - branch
+  - shop
+
+region:
+  - market
+  - area
+  - territory
+
+product_category:
+  - category
+  - merchandise category
+  - product group

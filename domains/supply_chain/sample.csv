@@ -1,0 +1,11 @@
+shipment_id,ship_date,warehouse,region,carrier,product_category,order_volume,shipped_units,on_time_shipments,late_shipments,average_delivery_days,delivery_cost,fulfillment_cost,damage_rate,stockout_rate
+S001,2026-01-03,Seattle FC,West,Carrier A,Electronics,1200,1180,1090,90,2.4,8500,12400,0.010,0.030
+S002,2026-01-06,Dallas FC,South,Carrier B,Home Goods,980,960,860,100,3.1,7200,10500,0.015,0.040
+S003,2026-01-09,Chicago FC,Midwest,Carrier C,Fashion,1450,1425,1320,105,2.8,9100,13800,0.012,0.025
+S004,2026-01-12,Newark FC,East,Carrier A,Beauty,760,750,690,60,2.6,5300,8200,0.008,0.020
+S005,2026-01-16,Phoenix FC,West,Carrier B,Grocery,1100,1085,970,115,3.3,8800,11900,0.018,0.050
+S006,2026-02-02,Seattle FC,West,Carrier C,Electronics,1320,1300,1210,90,2.3,8900,12900,0.009,0.028
+S007,2026-02-07,Dallas FC,South,Carrier A,Home Goods,1040,1010,930,80,2.9,7600,10900,0.013,0.035
+S008,2026-02-11,Chicago FC,Midwest,Carrier B,Beauty,900,880,790,90,3.2,6900,9500,0.017,0.042
+S009,2026-02-18,Newark FC,East,Carrier C,Fashion,1250,1235,1160,75,2.5,8100,12100,0.011,0.030
+S010,2026-02-23,Phoenix FC,West,Carrier A,Grocery,1180,1160,1020,140,3.5,9300,12600,0.020,0.055

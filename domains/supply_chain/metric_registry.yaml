@@ -1,0 +1,36 @@
+metrics:
+  - name: order_volume
+    definition: Total number of customer orders processed by the warehouse.
+    business_owner: Supply Chain BI Team
+
+  - name: shipped_units
+    definition: Total number of units shipped from the warehouse.
+    business_owner: Supply Chain BI Team
+
+  - name: on_time_shipments
+    definition: Number of shipments delivered within the promised delivery window.
+    business_owner: Supply Chain BI Team
+
+  - name: late_shipments
+    definition: Number of shipments delivered after the promised delivery window.
+    business_owner: Supply Chain BI Team
+
+  - name: average_delivery_days
+    definition: Average number of days between shipment date and delivery date.
+    business_owner: Supply Chain BI Team
+
+  - name: delivery_cost
+    definition: Total cost paid to carriers for delivery services.
+    business_owner: Supply Chain BI Team
+
+  - name: fulfillment_cost
+    definition: Total warehouse fulfillment cost, including picking, packing, and handling.
+    business_owner: Supply Chain BI Team
+
+  - name: damage_rate
+    definition: Damaged shipments divided by total shipments.
+    business_owner: Supply Chain BI Team
+
+  - name: stockout_rate
+    definition: Stockout events divided by total demand events.
+    business_owner: Supply Chain BI Team
