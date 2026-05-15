@@ -56,7 +56,7 @@ This config-driven structure makes the workflow reusable across multiple busines
 
 ---
 
-## Project Preview
+## Product Preview
 
 The app is organized as a product-style workflow rather than a one-off notebook. Users can select a domain pack, inspect the dataset, generate semantic metadata, validate candidate BI questions, and review dashboard signals from the sidebar workflow navigation.
 
@@ -94,11 +94,11 @@ The analytics dashboard summarizes validation outcomes, score spread, guardrail 
 
 ## Background
 
-This project was inspired by my experience building **Amazon Q Topics in QuickSight** when I was a BIE intern at Amazon.
+This product was inspired by my experience building **Amazon Q Topics in QuickSight** when I was a BIE intern at Amazon.
 
 While adding a **natural-language Q&A** feature to a dashboard was relatively straightforward, making the AI understand business context required a lot of manual setup. I had to define field synonyms, clarify metric meanings, collect frequently asked questions, and verify whether those questions were actually grounded in the dashboard logic.
 
-This project turns that pain point into a reusable workflow app pattern: **a configurable semantic BI system where BI teams can select a domain, inspect fields, generate semantic setup suggestions, validate candidate questions, and decide what is safe to promote into a trusted question library.**
+This product turns that pain point into a reusable workflow app pattern: **a configurable semantic BI system where BI teams can select a domain, inspect fields, generate semantic setup suggestions, validate candidate questions, and decide what is safe to promote into a trusted question library.**
 
 ---
 
@@ -108,7 +108,7 @@ This project turns that pain point into a reusable workflow app pattern: **a con
 
 Business users often ask questions using informal terms, incomplete context, or different wording from the actual dataset. Without strong semantic setup, the BI assistant may misunderstand the question, use the wrong metric, or generate answers that are not aligned with the official business definition.
 
-The main pain points this project addresses are:
+The main pain points this product addresses are:
 
 - Manual effort in setting up field names, synonyms, metric definitions, and verified questions
 - Risk of AI using unofficial or incorrect metric logic
@@ -276,7 +276,7 @@ This simulates the manual verified-question setup process used in natural-langua
 
 The question validation design was inspired by the modularized evaluation framework proposed by Ao, Singh, and Antinome (2026) in *Optimizing Prompt Refinement: Algorithmic Strategies for Large Language Model-based Text Classification*. The paper proposes breaking a complex classification task into separate evaluation categories, scoring each category independently, and then combining the scores with rule-based thresholds and deal-breaker logic for a final decision.
 
-In this project, I adapted that modularized approach from exam-question quality classification to BI question validation. Instead of evaluating exam questions by accuracy, clarity, complexity, format, and relevancy, this workflow evaluates candidate BI questions across five BI-focused dimensions:
+In this product, I adapted that modularized approach from exam-question quality classification to BI question validation. Instead of evaluating exam questions by accuracy, clarity, complexity, format, and relevancy, this workflow evaluates candidate BI questions across five BI-focused dimensions:
 
 | Dimension | Purpose |
 |---|---|
@@ -445,9 +445,9 @@ Planned phases include:
 
 ---
 
-## What This Project Demonstrates
+## What This Product Demonstrates
 
-This project demonstrates how to design a BI product workflow that connects **business context, semantic modeling, AI-assisted generation, validation logic, role-based governance, dashboard monitoring, and auditability.**
+This product demonstrates how to design a BI product workflow that connects **business context, semantic modeling, AI-assisted generation, validation logic, role-based governance, dashboard monitoring, and auditability.**
 
 It highlights:
 
