@@ -218,6 +218,75 @@ def get_promotion_df(results: Optional[Dict[str, Any]]) -> pd.DataFrame:
     return pd.DataFrame(results.get("promotion_results", []))
 
 
+# ---------------------------------------------------------------------------
+# Role simulator helpers
+# ---------------------------------------------------------------------------
+# This is a lightweight demo role simulator — no authentication is required.
+# Roles are selected freely from the sidebar to show how different personas
+# would experience the workflow in a real deployment.
+#
+# OIDC scaffold (disabled — for future deployment only):
+# To enable real authentication, set ENABLE_OIDC = True and configure the
+# provider details below. This requires streamlit-oidc or a similar library.
+#
+# ENABLE_OIDC = False
+# OIDC_CONFIG = {
+#     "provider_url": "https://your-idp.example.com",
+#     "client_id": "your-client-id",
+#     "redirect_uri": "https://your-app.example.com/callback",
+#     "scopes": ["openid", "profile", "email"],
+# }
+# When ENABLE_OIDC is True, replace get_current_role() with a function that
+# reads the authenticated user's role claim from the OIDC token instead of
+# reading from st.session_state["demo_role"].
+
+_ROLES = ["Admin", "BI Developer", "Business Viewer"]
+
+_ROLE_DESCRIPTIONS = {
+    "Admin": (
+        "Full access. Can run the pipeline, upload CSVs, use LLM-assisted mode, "
+        "download outputs, and view all pages."
+    ),
+    "BI Developer": (
+        "Full access. Can run the pipeline, upload CSVs, use LLM-assisted mode, "
+        "download outputs, and view all pages."
+    ),
+    "Business Viewer": (
+        "Read-only access. Can view Business Context, Verified Question Library, "
+        "Analytics Dashboard, and Monitoring & Audit Log. "
+        "Cannot run the pipeline, upload data, use LLM mode, or download outputs."
+    ),
+}
+
+_VIEWER_PAGES = {
+    "1. Business Context",
+    "6. Verified Question Library",
+    "7. Analytics Dashboard",
+    "8. Monitoring & Audit Log",
+}
+
+
+def get_current_role() -> str:
+    """Return the currently selected demo role."""
+    return st.session_state.get("demo_role", "Admin")
+
+
+def can_run_pipeline(role: str) -> bool:
+    return role in ("Admin", "BI Developer")
+
+
+def can_upload_data(role: str) -> bool:
+    return role in ("Admin", "BI Developer")
+
+
+def can_use_llm(role: str) -> bool:
+    return role in ("Admin", "BI Developer")
+
+
+def can_download_outputs(role: str) -> bool:
+    return role in ("Admin", "BI Developer")
+
+
 def render_product_header(
     df: pd.DataFrame,
     metric_registry: Dict[str, Any],
@@ -381,6 +450,7 @@ def render_upload_select_dataset(
     metric_registry: Dict[str, Any],
     glossary: Dict[str, Any],
     seed_questions: List[str],
+    role: str = "Admin",
 ):
     st.header("2. Upload / Select Dataset")
     st.write(f"Selected domain pack: `{format_domain_label(selected_domain)}`")
@@ -393,36 +463,39 @@ def render_upload_select_dataset(
         """
     )
 
-    uploaded_file = st.file_uploader(
-        "Optional: Upload a CSV for field preview",
-        type=["csv"],
-        help=(
-            "The full workflow currently uses curated domain packs. "
-            "Uploaded CSVs are used for preview only."
-        ),
-        key=f"dataset_preview_csv_uploader_{selected_domain}",
-    )
+    if can_upload_data(role):
+        uploaded_file = st.file_uploader(
+            "Optional: Upload a CSV for field preview",
+            type=["csv"],
+            help=(
+                "The full workflow currently uses curated domain packs. "
+                "Uploaded CSVs are used for preview only."
+            ),
+            key=f"dataset_preview_csv_uploader_{selected_domain}",
+        )
 
-    if uploaded_file is not None:
-        try:
-            uploaded_df = pd.read_csv(uploaded_file)
+        if uploaded_file is not None:
+            try:
+                uploaded_df = pd.read_csv(uploaded_file)
 
-            st.markdown("#### Uploaded CSV Preview")
-            st.dataframe(uploaded_df.head(20), use_container_width=True)
+                st.markdown("#### Uploaded CSV Preview")
+                st.dataframe(uploaded_df.head(20), use_container_width=True)
 
-            upload_cols = st.columns(3)
-            upload_cols[0].metric("Uploaded Rows", f"{uploaded_df.shape[0]:,}")
-            upload_cols[1].metric("Uploaded Fields", f"{uploaded_df.shape[1]:,}")
-            upload_cols[2].metric("Missing Cells", f"{uploaded_df.isna().sum().sum():,}")
+                upload_cols = st.columns(3)
+                upload_cols[0].metric("Uploaded Rows", f"{uploaded_df.shape[0]:,}")
+                upload_cols[1].metric("Uploaded Fields", f"{uploaded_df.shape[1]:,}")
+                upload_cols[2].metric("Missing Cells", f"{uploaded_df.isna().sum().sum():,}")
 
-            st.info(
-                "This uploaded file is shown for preview only. The full semantic workflow "
-                "still uses the selected domain pack because validation requires a metric "
-                "registry, glossary, and seed questions."
-            )
+                st.info(
+                    "This uploaded file is shown for preview only. The full semantic workflow "
+                    "still uses the selected domain pack because validation requires a metric "
+                    "registry, glossary, and seed questions."
+                )
 
-        except Exception as exc:
-            st.error(f"Unable to read uploaded CSV: {exc}")
+            except Exception as exc:
+                st.error(f"Unable to read uploaded CSV: {exc}")
+    else:
+        st.info("CSV upload is not available in Business Viewer mode.", icon="🔒")
 
     st.markdown("#### Selected Domain Dataset Preview")
     st.dataframe(df.head(20), use_container_width=True)
@@ -487,7 +560,7 @@ def render_field_profiling(results: Optional[Dict[str, Any]]):
     )
 
 
-def render_semantic_metadata_agent(results: Optional[Dict[str, Any]]):
+def render_semantic_metadata_agent(results: Optional[Dict[str, Any]], role: str = "Admin"):
     st.header("4. Semantic Metadata Agent")
 
     st.markdown(
@@ -498,41 +571,51 @@ def render_semantic_metadata_agent(results: Optional[Dict[str, Any]]):
         """
     )
 
-    # --- Mode toggle ---
-    mode = st.radio(
-        "Metadata generation mode",
-        options=["Rule-based", "LLM-assisted (Gemini)"],
-        index=0,
-        horizontal=True,
-        key="semantic_mode_toggle",
-        help=(
-            "Rule-based uses heuristics only. "
-            "LLM-assisted calls Gemini to enrich field metadata; "
-            "falls back to rule-based if the API key is missing or the call fails."
-        ),
-    )
-    st.session_state["semantic_mode"] = mode
+    # --- Mode toggle (Admin / BI Developer only) ---
+    if can_use_llm(role):
+        mode = st.radio(
+            "Metadata generation mode",
+            options=["Rule-based", "LLM-assisted (Gemini)"],
+            index=0,
+            horizontal=True,
+            key="semantic_mode_toggle",
+            help=(
+                "Rule-based uses heuristics only. "
+                "LLM-assisted calls Gemini to enrich field metadata; "
+                "falls back to rule-based if the API key is missing or the call fails."
+            ),
+        )
+        st.session_state["semantic_mode"] = mode
 
-    # Always re-read the current Gemini key status.
-    # This avoids stale disabled service objects after secrets.toml is added or changed.
-    if mode == "LLM-assisted (Gemini)":
-        llm_service = GeminiLLMService.from_env()
-        st.session_state["llm_service"] = llm_service
+        # Always re-read the current Gemini key status.
+        if mode == "LLM-assisted (Gemini)":
+            llm_service = GeminiLLMService.from_env()
+            st.session_state["llm_service"] = llm_service
 
-        if llm_service.is_available():
-            st.success("Gemini API key detected. LLM-assisted mode is active.", icon="✅")
-        else:
-            st.info(
-                "LLM-assisted mode is available as an optional bring-your-own-key feature. "
-                "This public demo does not include a hosted Gemini API key to prevent unintended API usage. "
-                "To try Gemini enrichment locally, clone the repo, create a Gemini API key in Google AI Studio, "
-                "and add it to `.streamlit/secrets.toml` as `GEMINI_API_KEY`. "
-                "For this hosted demo, the app will safely use rule-based fallback.",
-                icon="ℹ️",
-            )
+            if llm_service.is_available():
+                st.success("Gemini API key detected. LLM-assisted mode is active.", icon="✅")
+            else:
+                st.info(
+                    "LLM-assisted mode is available as an optional bring-your-own-key feature. "
+                    "This public demo does not include a hosted Gemini API key to prevent unintended API usage. "
+                    "To try Gemini enrichment locally, clone the repo, create a Gemini API key in Google AI Studio, "
+                    "and add it to `.streamlit/secrets.toml` as `GEMINI_API_KEY`. "
+                    "For this hosted demo, the app will safely use rule-based fallback.",
+                    icon="ℹ️",
+                )
+    else:
+        st.caption("Metadata generation mode: **Rule-based** (LLM-assisted mode is not available in Business Viewer mode.)")
 
     if not results:
-        st.info("Run the pipeline from the sidebar to generate semantic setup suggestions.")
+        if role == "Business Viewer":
+            st.info(
+                "No pipeline results are available yet. "
+                "Results are generated by Admin or BI Developer roles. "
+                "Ask your BI team to run the pipeline and share the results.",
+                icon="ℹ️",
+            )
+        else:
+            st.info("Run the pipeline from the sidebar to generate semantic setup suggestions.")
         return
 
     # Show which mode produced the current results
@@ -562,16 +645,17 @@ def render_semantic_metadata_agent(results: Optional[Dict[str, Any]]):
         use_container_width=True,
     )
 
-    csv = field_suggestions_df.to_csv(index=False).encode("utf-8")
-    st.download_button(
-        "Download Field Suggestions CSV",
-        data=csv,
-        file_name="field_suggestions.csv",
-        mime="text/csv",
-    )
+    if can_download_outputs(role):
+        csv = field_suggestions_df.to_csv(index=False).encode("utf-8")
+        st.download_button(
+            "Download Field Suggestions CSV",
+            data=csv,
+            file_name="field_suggestions.csv",
+            mime="text/csv",
+        )
 
 
-def render_question_validation(results: Optional[Dict[str, Any]]):
+def render_question_validation(results: Optional[Dict[str, Any]], role: str = "Admin"):
     st.header("5. Question Validation")
 
     st.markdown(
@@ -661,15 +745,16 @@ def render_question_validation(results: Optional[Dict[str, Any]]):
     )
 
     csv = promotion_df.to_csv(index=False).encode("utf-8")
-    st.download_button(
-        "Download Promotion Results CSV",
-        data=csv,
-        file_name="promotion_results.csv",
-        mime="text/csv",
-    )
+    if can_download_outputs(role):
+        st.download_button(
+            "Download Promotion Results CSV",
+            data=csv,
+            file_name="promotion_results.csv",
+            mime="text/csv",
+        )
 
 
-def render_verified_question_library(results: Optional[Dict[str, Any]]):
+def render_verified_question_library(results: Optional[Dict[str, Any]], role: str = "Admin"):
     st.header("6. Verified Question Library")
 
     st.markdown(
@@ -680,7 +765,15 @@ def render_verified_question_library(results: Optional[Dict[str, Any]]):
     )
 
     if not results:
-        st.info("Run the pipeline from the sidebar to generate verified question candidates.")
+        if role == "Business Viewer":
+            st.info(
+                "No verified questions are available yet. "
+                "Results are generated by Admin or BI Developer roles. "
+                "Ask your BI team to run the pipeline and share the results.",
+                icon="ℹ️",
+            )
+        else:
+            st.info("Run the pipeline from the sidebar to generate verified question candidates.")
         return
 
     promotion_df = pd.DataFrame(results["promotion_results"])
@@ -713,16 +806,17 @@ def render_verified_question_library(results: Optional[Dict[str, Any]]):
         use_container_width=True,
     )
 
-    csv = verified_df.to_csv(index=False).encode("utf-8")
-    st.download_button(
-        "Download Verified Questions CSV",
-        data=csv,
-        file_name="verified_questions.csv",
-        mime="text/csv",
-    )
+    if can_download_outputs(role):
+        csv = verified_df.to_csv(index=False).encode("utf-8")
+        st.download_button(
+            "Download Verified Questions CSV",
+            data=csv,
+            file_name="verified_questions.csv",
+            mime="text/csv",
+        )
 
 
-def render_analytics_dashboard(results: Optional[Dict[str, Any]]):
+def render_analytics_dashboard(results: Optional[Dict[str, Any]], role: str = "Admin"):
     st.header("7. Analytics Dashboard")
 
     st.markdown(
@@ -733,7 +827,15 @@ def render_analytics_dashboard(results: Optional[Dict[str, Any]]):
     )
 
     if not results:
-        st.info("Run the pipeline from the sidebar to populate dashboard signals.")
+        if role == "Business Viewer":
+            st.info(
+                "No pipeline results are available yet. "
+                "Results are generated by Admin or BI Developer roles. "
+                "Ask your BI team to run the pipeline and share the results.",
+                icon="ℹ️",
+            )
+        else:
+            st.info("Run the pipeline from the sidebar to populate dashboard signals.")
         return
 
     promotion_df = pd.DataFrame(results["promotion_results"])
@@ -1163,7 +1265,7 @@ def render_analytics_dashboard(results: Optional[Dict[str, Any]]):
         )
 
 
-def render_monitoring_audit_log(results: Optional[Dict[str, Any]]):
+def render_monitoring_audit_log(results: Optional[Dict[str, Any]], role: str = "Admin"):
     st.header("8. Monitoring & Audit Log")
 
     st.markdown(
@@ -1175,7 +1277,15 @@ def render_monitoring_audit_log(results: Optional[Dict[str, Any]]):
     )
 
     if not results:
-        st.info("Run the pipeline from the sidebar to generate review activity.")
+        if role == "Business Viewer":
+            st.info(
+                "No pipeline results are available yet. "
+                "Results are generated by Admin or BI Developer roles. "
+                "Ask your BI team to run the pipeline and share the results.",
+                icon="ℹ️",
+            )
+        else:
+            st.info("Run the pipeline from the sidebar to generate review activity.")
         return
 
     promotion_df = pd.DataFrame(results["promotion_results"])
@@ -1234,6 +1344,21 @@ if not domain_names:
 with st.sidebar:
     st.header("Workflow Settings")
 
+    # --- Demo role selector ---
+    selected_role = st.selectbox(
+        "Demo Role",
+        options=_ROLES,
+        index=0,
+        key="demo_role",
+        help="Select a role to simulate how different personas experience the workflow.",
+    )
+
+    with st.expander("Role permissions"):
+        st.markdown(f"**{selected_role}**")
+        st.caption(_ROLE_DESCRIPTIONS[selected_role])
+
+    st.divider()
+
     selected_domain = st.selectbox(
         "Select domain pack",
         domain_names,
@@ -1250,13 +1375,18 @@ with st.sidebar:
         step=5,
     )
 
-    run_button = st.button("Run Pipeline", type="primary")
+    if can_run_pipeline(selected_role):
+        run_button = st.button("Run Pipeline", type="primary")
+    else:
+        run_button = False
+        st.button("Run Pipeline", type="primary", disabled=True,
+                  help="Pipeline execution is not available in Business Viewer mode.")
 
     st.divider()
 
-    page = st.radio(
-        "Workflow Navigation",
-        [
+    # Restrict page list for Business Viewer
+    if can_run_pipeline(selected_role):
+        available_pages = [
             "1. Business Context",
             "2. Upload / Select Dataset",
             "3. Field Profiling",
@@ -1265,7 +1395,13 @@ with st.sidebar:
             "6. Verified Question Library",
             "7. Analytics Dashboard",
             "8. Monitoring & Audit Log",
-        ],
+        ]
+    else:
+        available_pages = sorted(_VIEWER_PAGES)
+
+    page = st.radio(
+        "Workflow Navigation",
+        available_pages,
         key="workflow_navigation_page",
         on_change=request_scroll_to_top,
     )
@@ -1286,7 +1422,7 @@ if run_button:
         selected_mode = st.session_state.get("semantic_mode", "Rule-based")
         active_llm_service = None
 
-        if selected_mode == "LLM-assisted (Gemini)":
+        if selected_mode == "LLM-assisted (Gemini)" and can_use_llm(selected_role):
             active_llm_service = GeminiLLMService.from_env()
             st.session_state["llm_service"] = active_llm_service
 
@@ -1339,25 +1475,26 @@ elif page == "2. Upload / Select Dataset":
         metric_registry=metric_registry,
         glossary=glossary,
         seed_questions=seed_questions,
+        role=selected_role,
     )
 
 elif page == "3. Field Profiling":
     render_field_profiling(results)
 
 elif page == "4. Semantic Metadata Agent":
-    render_semantic_metadata_agent(results)
+    render_semantic_metadata_agent(results, role=selected_role)
 
 elif page == "5. Question Validation":
-    render_question_validation(results)
+    render_question_validation(results, role=selected_role)
 
 elif page == "6. Verified Question Library":
-    render_verified_question_library(results)
+    render_verified_question_library(results, role=selected_role)
 
 elif page == "7. Analytics Dashboard":
-    render_analytics_dashboard(results)
+    render_analytics_dashboard(results, role=selected_role)
 
 elif page == "8. Monitoring & Audit Log":
-    render_monitoring_audit_log(results)
+    render_monitoring_audit_log(results, role=selected_role)
 
 # Run the scroll script after all content is rendered.
 # This is more reliable than calling it before page content is mounted.

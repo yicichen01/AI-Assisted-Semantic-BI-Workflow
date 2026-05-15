@@ -319,11 +319,11 @@ The upgraded app includes a public demo role simulator and optional authenticati
 
 Planned roles:
 
-| Role | Upload Data | Generate Metadata | Approve Verified Questions | View Dashboard |
+| Role | Upload Data | Generate Metadata | Manage Verified Questions | View Dashboard |
 |---|---:|---:|---:|---:|
 | Admin | ✅ | ✅ | ✅ | ✅ |
-| BI Developer | ✅ | ✅ | ❌ | ✅ |
-| Business Viewer | ❌ | ❌ | ❌ | ✅ |
+| BI Developer | ✅ | ✅ | View only | ✅ |
+| Business Viewer | ❌ | ❌ | View only | ✅ |
 
 For the public demo, the app uses a role simulator so reviewers can see how different users experience the workflow without needing to log in.
 
