@@ -58,21 +58,37 @@ This config-driven structure makes the workflow reusable across multiple busines
 
 ## Project Preview
 
-### Streamlit MVP
+The app is organized as a product-style workflow rather than a one-off notebook. Users can select a domain pack, inspect the dataset, generate semantic metadata, validate candidate BI questions, and review dashboard signals from the sidebar workflow navigation.
 
-![Streamlit MVP](assets/screenshots/workflow_summary.png)
+### Product Overview and Workflow Navigation
 
-### Semantic Setup and Question Validation
+The homepage explains the app purpose, the semantic BI workflow, and the three-step demo flow for reviewers.
 
-![Semantic Setup](assets/screenshots/semantic_setup.png)
+![Product Overview and Workflow Navigation](assets/screenshots/01_homepage_overview.png)
 
-### Candidate Verified Questions
+### Domain Dataset Selection and CSV Preview
 
-![Candidate Questions](assets/screenshots/candidate_questions.png)
+The public demo uses curated domain packs for the full workflow. Users can also upload a CSV for preview-only field inspection, while the full validation workflow remains grounded in the selected domain pack’s metric registry, glossary, and seed questions.
 
-### Promotion Decision
+![Domain Dataset Selection and CSV Preview](assets/screenshots/02_dataset_selection.png)
 
-![Promotion Decision](assets/screenshots/scoring_promotion.png)
+### Semantic Metadata Agent
+
+The semantic metadata agent profiles raw fields and recommends BI-ready field metadata, including include/exclude decisions, friendly names, field roles, default aggregation logic, synonyms, confidence, and rationale.
+
+![Semantic Metadata Agent](assets/screenshots/03_semantic_metadata_agent.png)
+
+### Question Validation and Promotion Scoring
+
+Candidate BI questions are generated from domain context and scored before being promoted. The workflow separates questions into `Verified`, `Review`, and `Reject` outcomes based on grounding, clarity, business relevance, and guardrail logic.
+
+![Question Validation and Promotion Scoring](assets/screenshots/04_question_validation.png)
+
+### BI Readiness Dashboard
+
+The analytics dashboard summarizes validation outcomes, score spread, guardrail issue types, and questions requiring attention. This gives BI owners a quick view of whether the semantic layer is ready for trusted self-service analytics.
+
+![BI Readiness Dashboard](assets/screenshots/05_analytics_dashboard.png)
 
 ---
 
