@@ -35,6 +35,8 @@ class BIWorkflowPipeline:
         glossary: Dict[str, Any],
         seed_questions: List[str],
         max_questions: int = 20,
+        llm_service: Any = None,
+        domain_name: str = "",
     ) -> Dict[str, Any]:
         """Run the full BI workflow pipeline."""
 
@@ -45,6 +47,8 @@ class BIWorkflowPipeline:
             metric_registry=metric_registry,
             glossary=glossary,
             seed_questions=seed_questions,
+            llm_service=llm_service,
+            domain_name=domain_name,
         )
 
         candidate_questions = self.question_generator.generate_candidates(

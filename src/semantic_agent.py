@@ -8,13 +8,18 @@ Responsibilities:
 - Bridge domain knowledge with technical schema
 """
 
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from services.llm_service import GeminiLLMService
+
 from .schemas import FieldProfile, FieldSuggestion
 
 class SemanticAgent:
     """
     Generates first-pass semantic setup suggestions for BI fields using improved heuristics.
-    Modular design for later LLM integration.
+    Optionally delegates to a GeminiLLMService for enriched metadata; falls back to
+    rule-based output per field when the LLM is unavailable or returns an invalid response.
     """
 
     def __init__(self):
@@ -25,10 +30,16 @@ class SemanticAgent:
         field_profiles: List[FieldProfile],
         metric_registry: Optional[Dict[str, Any]] = None,
         glossary: Optional[Dict[str, List[str]]] = None,
-        seed_questions: Optional[List[str]] = None
+        seed_questions: Optional[List[str]] = None,
+        llm_service: Optional[Any] = None,
+        domain_name: str = "",
     ) -> List[FieldSuggestion]:
         """
         Generate semantic suggestions for BI fields.
+
+        When llm_service is provided and available, each field is enriched via Gemini.
+        If the LLM call fails or returns an invalid response for a field, the rule-based
+        result is used for that field transparently.
         """
         seed_questions = seed_questions or []
         glossary = glossary or {}
@@ -43,36 +54,31 @@ class SemanticAgent:
             dtype = profile.dtype
             role = profile.heuristic_role
 
-            # --- ID fields ---
+            # --- Rule-based defaults (always computed as fallback) ---
             if role == "id":
                 include = False
                 field_role = "id"
                 default_aggregation = None
                 disallowed_aggregations = ["sum", "avg", "min", "max"]
-                # Allow count for IDs
                 format_ = None
-            # --- Date fields ---
             elif role == "date":
                 include = True
                 field_role = "date"
                 default_aggregation = None
                 disallowed_aggregations = ["sum", "avg"]
                 format_ = "yyyy-mm-dd"
-            # --- Measure fields ---
             elif role == "measure":
                 include = True
                 field_role = "measure"
                 default_aggregation = self._choose_default_aggregation(name_lower, metric_registry)
                 disallowed_aggregations = ["count"] if default_aggregation else []
                 format_ = None
-            # --- Flag fields ---
             elif role == "flag":
                 include = True
                 field_role = "flag"
                 default_aggregation = "count"
                 disallowed_aggregations = ["sum", "avg", "min", "max"]
                 format_ = None
-            # --- Dimension fields ---
             else:
                 include = True
                 field_role = "dimension"
@@ -80,13 +86,9 @@ class SemanticAgent:
                 disallowed_aggregations = ["sum", "avg", "min", "max"]
                 format_ = None
 
-            # Friendly name
             friendly_name = name.replace("_", " ").title()
-
-            # Synonyms
             synonyms = self._lookup_synonyms(name, glossary)
 
-            # Confidence scoring
             confidence = self._base_confidence(role)
             if self._field_mentioned_in_questions(name_lower, question_text):
                 confidence += 0.15
@@ -96,8 +98,45 @@ class SemanticAgent:
                 confidence += 0.1
             confidence = min(max(confidence, 0.0), 1.0)
 
-            # Rationale
             rationale = self._build_rationale(role, name, metric_registry, synonyms, question_text)
+
+            # --- Optional LLM enrichment (overrides friendly_name, synonyms,
+            #     default_aggregation, disallowed_aggregations, confidence, rationale) ---
+            if llm_service is not None and llm_service.is_available():
+                glossary_entry = glossary.get(name) or glossary.get(name_lower)
+                metric_entry = (
+                    metric_registry.get(name)
+                    or metric_registry.get(name_lower)
+                )
+                llm_meta = llm_service.enrich_field(
+                    field_name=name,
+                    dtype=dtype,
+                    heuristic_role=role,
+                    sample_values=profile.sample_values,
+                    null_rate=profile.null_rate,
+                    distinct_count=profile.distinct_count,
+                    glossary_entry=glossary_entry,
+                    metric_entry=metric_entry,
+                    domain_name=domain_name,
+                    seed_questions=seed_questions,
+                )
+                if llm_meta is not None:
+                    friendly_name = llm_meta.friendly_name or friendly_name
+                    synonyms = llm_meta.synonyms if llm_meta.synonyms else synonyms
+                    if llm_meta.default_aggregation:
+                        default_aggregation = llm_meta.default_aggregation
+                    if llm_meta.disallowed_aggregations:
+                        disallowed_aggregations = llm_meta.disallowed_aggregations
+                    confidence = llm_meta.confidence_score
+                    # Build rationale from LLM fields; fall back to rule-based if empty
+                    llm_rationale_parts = []
+                    if llm_meta.business_definition:
+                        llm_rationale_parts.append(llm_meta.business_definition)
+                    if llm_meta.data_quality_notes:
+                        llm_rationale_parts.append(llm_meta.data_quality_notes)
+                    if llm_meta.needs_human_review:
+                        llm_rationale_parts.append("Flagged for human review.")
+                    rationale = " ".join(llm_rationale_parts) if llm_rationale_parts else rationale
 
             suggestion = FieldSuggestion(
                 field_name=name,
@@ -109,7 +148,7 @@ class SemanticAgent:
                 disallowed_aggregations=disallowed_aggregations,
                 format=format_,
                 confidence=confidence,
-                rationale=rationale
+                rationale=rationale,
             )
             suggestions.append(suggestion)
 

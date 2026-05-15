@@ -3,3 +3,4 @@ pandas
 pydantic
 pyyaml
 plotly
+google-genai

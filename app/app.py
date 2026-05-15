@@ -26,6 +26,7 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.append(str(PROJECT_ROOT))
 
 from src.pipeline import BIWorkflowPipeline
+from services.llm_service import GeminiLLMService
 
 
 DOMAINS_DIR = PROJECT_ROOT / "domains"
@@ -189,6 +190,8 @@ def run_pipeline(
     glossary: Dict[str, Any],
     seed_questions: List[str],
     max_questions: int,
+    llm_service: Optional[Any] = None,
+    domain_name: str = "",
 ) -> Dict[str, Any]:
     pipeline = BIWorkflowPipeline()
     return pipeline.run(
@@ -197,6 +200,8 @@ def run_pipeline(
         glossary=glossary,
         seed_questions=seed_questions,
         max_questions=max_questions,
+        llm_service=llm_service,
+        domain_name=domain_name,
     )
 
 
@@ -493,9 +498,44 @@ def render_semantic_metadata_agent(results: Optional[Dict[str, Any]]):
         """
     )
 
+    # --- Mode toggle ---
+    mode = st.radio(
+        "Metadata generation mode",
+        options=["Rule-based", "LLM-assisted (Gemini)"],
+        index=0,
+        horizontal=True,
+        key="semantic_mode_toggle",
+        help=(
+            "Rule-based uses heuristics only. "
+            "LLM-assisted calls Gemini to enrich field metadata; "
+            "falls back to rule-based if the API key is missing or the call fails."
+        ),
+    )
+    st.session_state["semantic_mode"] = mode
+
+    # Show a small status note for LLM mode without exposing the key
+    if mode == "LLM-assisted (Gemini)":
+        llm_service: GeminiLLMService = st.session_state.get("llm_service")
+        if llm_service is None:
+            llm_service = GeminiLLMService.from_env()
+            st.session_state["llm_service"] = llm_service
+
+        if llm_service.is_available():
+            st.success("Gemini API key detected. LLM-assisted mode is active.", icon="✅")
+        else:
+            st.info(
+                "No Gemini API key found. Add GEMINI_API_KEY to `.streamlit/secrets.toml` "
+                "or set it as an environment variable. Rule-based output will be used.",
+                icon="ℹ️",
+            )
+
     if not results:
         st.info("Run the pipeline from the sidebar to generate semantic setup suggestions.")
         return
+
+    # Show which mode produced the current results
+    produced_by = st.session_state.get("last_run_mode", "Rule-based")
+    st.caption(f"Results produced by: **{produced_by}**")
 
     field_suggestions_df = clean_dataframe_for_display(objects_to_df(results["field_suggestions"]))
 
@@ -1239,15 +1279,27 @@ if st.session_state.get("selected_domain") != selected_domain:
 
 if run_button:
     with st.spinner("Running semantic BI workflow..."):
+        # Resolve LLM service based on current mode selection
+        selected_mode = st.session_state.get("semantic_mode", "Rule-based")
+        active_llm_service = None
+        if selected_mode == "LLM-assisted (Gemini)":
+            active_llm_service = st.session_state.get("llm_service")
+            if active_llm_service is None:
+                active_llm_service = GeminiLLMService.from_env()
+                st.session_state["llm_service"] = active_llm_service
+
         results = run_pipeline(
             df=df,
             metric_registry=metric_registry,
             glossary=glossary,
             seed_questions=seed_questions,
             max_questions=max_questions,
+            llm_service=active_llm_service,
+            domain_name=selected_domain,
         )
         st.session_state["pipeline_results"] = results
         st.session_state["selected_domain"] = selected_domain
+        st.session_state["last_run_mode"] = selected_mode
 
 results = get_results_for_current_domain(selected_domain)
 
