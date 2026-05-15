@@ -1,0 +1,119 @@
+forecasted_packages:
+  - forecasted volume
+  - planned packages
+  - expected packages
+  - projected package volume
+
+actual_packages:
+  - actual volume
+  - observed packages
+  - realized packages
+  - delivered package volume
+
+volume_variance:
+  - forecast variance
+  - volume gap
+  - actual versus forecast difference
+  - volume difference
+
+forecast_error_pct:
+  - forecast error percentage
+  - forecast error rate
+  - forecast accuracy gap
+  - planning error rate
+
+planned_capacity:
+  - capacity plan
+  - planned network capacity
+  - planned transportation capacity
+  - scheduled capacity
+
+available_capacity:
+  - remaining capacity
+  - open capacity
+  - unused capacity
+  - capacity buffer
+
+capacity_utilization:
+  - utilization rate
+  - capacity usage
+  - capacity used
+  - network utilization
+
+cost_per_package:
+  - CPP
+  - unit cost
+  - cost per unit
+  - transportation cost per package
+
+on_time_delivery_rate:
+  - OTD
+  - on-time rate
+  - delivery punctuality
+  - service quality rate
+
+missed_promise_units:
+  - missed promises
+  - late units
+  - promise misses
+  - missed delivery commitment units
+
+backlog_units:
+  - backlog
+  - pending units
+  - delayed units
+  - unprocessed units
+
+region:
+  - market
+  - area
+  - geography
+  - operating region
+
+node_type:
+  - facility type
+  - node category
+  - operational node type
+  - network node type
+
+origin_node:
+  - origin facility
+  - source node
+  - starting node
+  - departure node
+
+destination_node:
+  - destination facility
+  - target node
+  - ending node
+  - arrival node
+
+lane_id:
+  - lane
+  - transportation lane
+  - route
+  - origin destination lane
+
+ship_method:
+  - shipping method
+  - delivery method
+  - service type
+  - transportation mode
+
+plan_week:
+  - planning week
+  - week
+  - plan period
+  - reporting week
+
+labor_hours:
+  - staffing hours
+  - labor input
+  - planned labor hours
+  - operational labor hours
+
+trailer_count:
+  - trailer volume
+  - trailer units
+  - planned trailers
+  - transportation assets

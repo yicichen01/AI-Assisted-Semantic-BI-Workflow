@@ -1,0 +1,52 @@
+metrics:
+  - name: forecasted_packages
+    definition: Expected package volume for a planning week, region, lane, or transportation segment.
+    business_owner: Transportation Planning BI Team
+
+  - name: actual_packages
+    definition: Observed package volume for a planning week, region, lane, or transportation segment.
+    business_owner: Transportation Planning BI Team
+
+  - name: volume_variance
+    definition: Actual packages minus forecasted packages, used to measure the gap between planned and observed volume.
+    business_owner: Transportation Planning BI Team
+
+  - name: forecast_error_pct
+    definition: Percentage difference between forecasted packages and actual packages.
+    business_owner: Transportation Planning BI Team
+
+  - name: planned_capacity
+    definition: Planned transportation capacity available for a planning period, lane, region, or node.
+    business_owner: Transportation Planning BI Team
+
+  - name: available_capacity
+    definition: Remaining transportation capacity after accounting for planned or actual package demand.
+    business_owner: Transportation Planning BI Team
+
+  - name: capacity_utilization
+    definition: Actual packages divided by planned capacity, used to measure how much capacity is being used.
+    business_owner: Transportation Planning BI Team
+
+  - name: cost_per_package
+    definition: Average transportation cost per package for a selected lane, region, or ship method.
+    business_owner: Transportation Planning BI Team
+
+  - name: on_time_delivery_rate
+    definition: Percentage of packages delivered on time within the selected transportation segment.
+    business_owner: Transportation Planning BI Team
+
+  - name: missed_promise_units
+    definition: Number of packages that missed the expected delivery promise.
+    business_owner: Transportation Planning BI Team
+
+  - name: backlog_units
+    definition: Number of units not yet processed, moved, or completed within the expected planning window.
+    business_owner: Transportation Planning BI Team
+
+  - name: labor_hours
+    definition: Total labor hours used or planned for transportation operations in a selected segment.
+    business_owner: Transportation Planning BI Team
+
+  - name: trailer_count
+    definition: Number of trailers planned or used for transportation movement in a selected segment.
+    business_owner: Transportation Planning BI Team

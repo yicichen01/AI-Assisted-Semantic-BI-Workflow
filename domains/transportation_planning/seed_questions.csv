@@ -1,0 +1,31 @@
+question
+What is weekly actual package volume by region?
+Which regions had the largest volume variance last week?
+Which lanes had actual packages above planned capacity?
+Where is forecast error highest by region?
+Where is forecast error highest by ship method?
+Which lanes have the highest forecast error percentage?
+Which regions are closest to capacity limits?
+Which lanes have the highest capacity utilization?
+Which node types have the lowest available capacity?
+Which lanes have high backlog units and low available capacity?
+Which regions show repeated missed promise units?
+What is on-time delivery rate by region?
+Which ship methods have the lowest on-time delivery rate?
+Which lanes have high cost per package and high actual package volume?
+What is average cost per package by region?
+How did forecasted packages compare with actual packages over time?
+Which regions are consistently under-forecasted?
+Which regions are consistently over-forecasted?
+Which node types have the highest backlog units?
+Which lanes have the largest week-over-week change in actual packages?
+Which ship methods carry the most package volume?
+Which regions have high volume variance and low on-time delivery rate?
+Which lanes have high missed promise units and high capacity utilization?
+What is planned capacity by region and week?
+What is available capacity by lane?
+Which origin nodes have the highest actual package volume?
+Which destination nodes have the highest missed promise units?
+How does cost per package trend over time?
+Which lanes should be prioritized for capacity review?
+Which regions need attention based on forecast error, backlog, and service quality?
