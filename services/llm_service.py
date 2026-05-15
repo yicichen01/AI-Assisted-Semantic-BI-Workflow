@@ -1,251 +1,206 @@
 """
-Optional Gemini LLM service for semantic metadata enrichment.
+Optional Google Gemini integration for semantic metadata generation.
 
-Responsibilities:
-- Read GEMINI_API_KEY from Streamlit secrets or environment variables
-- Call Gemini to generate enriched field metadata
-- Validate the structured response with Pydantic
-- Return None on any failure so the caller can fall back to rule-based output
-
-This module never raises exceptions to the caller and never logs the API key.
+This service is intentionally defensive:
+- reads GEMINI_API_KEY from Streamlit secrets first, then environment variables
+- never exposes or logs the API key
+- returns None on any LLM failure so the app can fall back to rule-based output
 """
 
 import json
-import logging
 import os
+import re
 from typing import Any, Dict, List, Optional
 
-from pydantic import BaseModel, ValidationError
+import streamlit as st
+from pydantic import BaseModel, Field, ValidationError
 
-logger = logging.getLogger(__name__)
 
-
-# ---------------------------------------------------------------------------
-# Pydantic model for structured LLM output
-# ---------------------------------------------------------------------------
-
-class LLMFieldMetadata(BaseModel):
-    """Validated structured output from the Gemini LLM for a single field."""
-
+class SemanticMetadataLLMOutput(BaseModel):
     field_name: str
     friendly_name: str
     business_definition: str
-    synonyms: List[str]
+    synonyms: List[str] = Field(default_factory=list)
     default_aggregation: Optional[str] = None
-    disallowed_aggregations: List[str]
-    data_quality_notes: str
-    business_owner_hint: str
-    confidence_score: float          # 0.0 – 1.0
-    needs_human_review: bool
+    disallowed_aggregations: List[str] = Field(default_factory=list)
+    data_quality_notes: List[str] = Field(default_factory=list)
+    business_owner_hint: Optional[str] = None
+    confidence_score: float = 0.0
+    needs_human_review: bool = True
 
-
-# ---------------------------------------------------------------------------
-# Service
-# ---------------------------------------------------------------------------
 
 class GeminiLLMService:
-    """
-    Thin wrapper around the google-genai SDK for field metadata enrichment.
+    """Small wrapper around Google Gemini for optional semantic metadata enrichment."""
 
-    Usage:
-        service = GeminiLLMService.from_env()
-        if service.is_available():
-            metadata = service.enrich_field(profile, glossary_entry, metric_entry)
-    """
-
-    _MODEL = "gemini-2.0-flash"
-
-    def __init__(self, api_key: Optional[str]) -> None:
+    def __init__(
+        self,
+        api_key: Optional[str] = None,
+        model_name: str = "gemini-2.5-flash",
+    ):
         self._api_key = api_key
+        self._model_name = model_name
         self._client = None
+        self._init_error = None
 
-        if api_key:
-            try:
-                from google import genai  # type: ignore
-                self._client = genai.Client(api_key=api_key)
-            except Exception:
-                # google-genai not installed or key rejected at init time
-                self._client = None
-
-    # ------------------------------------------------------------------
-    # Factory
-    # ------------------------------------------------------------------
+        if self._api_key:
+            self._initialize_client()
 
     @classmethod
     def from_env(cls) -> "GeminiLLMService":
-        """
-        Build a service instance by reading the API key from:
-        1. st.secrets["GEMINI_API_KEY"]  (Streamlit Cloud / local secrets.toml)
-        2. os.environ["GEMINI_API_KEY"]
-        Returns a disabled instance (is_available() == False) if the key is absent.
-        """
-        api_key: Optional[str] = None
+        """Create a service using Streamlit secrets first, then environment variables."""
+        api_key = None
 
-        # Try Streamlit secrets first (only available when Streamlit is running)
         try:
-            import streamlit as st  # type: ignore
             api_key = st.secrets.get("GEMINI_API_KEY") or None
         except Exception:
-            pass
+            api_key = None
 
-        # Fall back to environment variable
         if not api_key:
-            api_key = os.environ.get("GEMINI_API_KEY") or None
+            api_key = os.getenv("GEMINI_API_KEY") or None
 
-        return cls(api_key)
+        return cls(api_key=api_key)
 
-    # ------------------------------------------------------------------
-    # Public API
-    # ------------------------------------------------------------------
+    def _initialize_client(self) -> None:
+        """Initialize Gemini client. Keep failures internal so the app can fall back."""
+        try:
+            from google import genai
+
+            self._client = genai.Client(api_key=self._api_key)
+            self._init_error = None
+        except Exception as exc:
+            self._client = None
+            self._init_error = str(exc)
 
     def is_available(self) -> bool:
-        """Return True only when the client was initialised successfully."""
-        return self._client is not None
+        """Return True only when an API key exists and the Gemini client initialized."""
+        return bool(self._api_key and self._client)
 
     def enrich_field(
         self,
-        field_name: str,
-        dtype: str,
-        heuristic_role: str,
-        sample_values: List[str],
-        null_rate: float,
-        distinct_count: int,
-        glossary_entry: Optional[List[str]],
-        metric_entry: Optional[Dict[str, Any]],
-        domain_name: str,
-        seed_questions: Optional[List[str]] = None,
-    ) -> Optional[LLMFieldMetadata]:
+        field_profile: Any,
+        metric_registry: Optional[Dict[str, Any]] = None,
+        glossary: Optional[Dict[str, Any]] = None,
+        domain_name: str = "",
+    ) -> Optional[Dict[str, Any]]:
         """
-        Ask Gemini to generate enriched metadata for a single field.
+        Generate semantic metadata for one field.
 
-        Returns a validated LLMFieldMetadata on success, or None on any failure.
-        The caller must treat None as a signal to use rule-based output instead.
+        Returns:
+            dict if Gemini succeeds and output passes validation
+            None if unavailable or invalid, allowing rule-based fallback
         """
         if not self.is_available():
             return None
 
+        field_context = self._normalize_field_profile(field_profile)
         prompt = self._build_prompt(
-            field_name=field_name,
-            dtype=dtype,
-            heuristic_role=heuristic_role,
-            sample_values=sample_values,
-            null_rate=null_rate,
-            distinct_count=distinct_count,
-            glossary_entry=glossary_entry,
-            metric_entry=metric_entry,
+            field_context=field_context,
+            metric_registry=metric_registry or {},
+            glossary=glossary or {},
             domain_name=domain_name,
-            seed_questions=seed_questions or [],
         )
 
         try:
-            from google import genai  # type: ignore
-
             response = self._client.models.generate_content(
-                model=self._MODEL,
+                model=self._model_name,
                 contents=prompt,
             )
-            raw_text = response.text or ""
-            return self._parse_response(raw_text, field_name)
 
-        except Exception as exc:
-            # Log at debug level — never surface the key or crash the app
-            logger.debug("Gemini call failed for field '%s': %s", field_name, type(exc).__name__)
+            response_text = getattr(response, "text", None)
+            if not response_text:
+                return None
+
+            parsed_json = self._extract_json(response_text)
+            if not parsed_json:
+                return None
+
+            validated = SemanticMetadataLLMOutput(**parsed_json)
+            return validated.model_dump()
+
+        except (ValidationError, Exception):
             return None
 
-    # ------------------------------------------------------------------
-    # Internal helpers
-    # ------------------------------------------------------------------
+    def _normalize_field_profile(self, field_profile: Any) -> Dict[str, Any]:
+        """Convert Pydantic object, dict, or generic object into a plain dict."""
+        if hasattr(field_profile, "model_dump"):
+            return field_profile.model_dump()
+
+        if hasattr(field_profile, "dict"):
+            return field_profile.dict()
+
+        if isinstance(field_profile, dict):
+            return field_profile
+
+        return {"field_name": str(field_profile)}
 
     def _build_prompt(
         self,
-        field_name: str,
-        dtype: str,
-        heuristic_role: str,
-        sample_values: List[str],
-        null_rate: float,
-        distinct_count: int,
-        glossary_entry: Optional[List[str]],
-        metric_entry: Optional[Dict[str, Any]],
+        field_context: Dict[str, Any],
+        metric_registry: Dict[str, Any],
+        glossary: Dict[str, Any],
         domain_name: str,
-        seed_questions: List[str],
     ) -> str:
-        glossary_context = (
-            f"Glossary synonyms for this field: {', '.join(glossary_entry)}"
-            if glossary_entry
-            else "No glossary entry found for this field."
-        )
+        field_name = field_context.get("field_name", "")
 
-        metric_context = (
-            f"Metric registry entry: {json.dumps(metric_entry)}"
-            if metric_entry
-            else "No metric registry entry found for this field."
-        )
+        grounding_context = {
+            "domain_name": domain_name,
+            "field_profile": field_context,
+            "metric_registry": metric_registry,
+            "glossary_entry_for_field": glossary.get(field_name),
+        }
 
-        seed_context = (
-            f"Sample business questions for this domain: {'; '.join(seed_questions[:5])}"
-            if seed_questions
-            else ""
-        )
+        return f"""
+You are helping a Business Intelligence team create governed semantic metadata for a natural-language BI layer.
 
-        return f"""You are a BI semantic layer expert. Generate structured metadata for a single dataset field.
+Use the provided domain context as grounding. If the metric registry or glossary already includes information for the field, use it instead of inventing a conflicting definition.
 
-Domain: {domain_name}
-Field name: {field_name}
-Data type: {dtype}
-Heuristic role: {heuristic_role}
-Sample values: {', '.join(str(v) for v in sample_values[:5])}
-Null rate: {null_rate:.1%}
-Distinct count: {distinct_count}
-{glossary_context}
-{metric_context}
-{seed_context}
+Return ONLY valid JSON. Do not include markdown, code fences, or explanatory prose.
 
-Return ONLY a valid JSON object with exactly these fields (no markdown, no explanation):
+Required JSON schema:
 {{
-  "field_name": "{field_name}",
-  "friendly_name": "<human-readable label>",
-  "business_definition": "<one sentence business definition>",
-  "synonyms": ["<synonym1>", "<synonym2>"],
-  "default_aggregation": "<sum|avg|count|min|max or null>",
-  "disallowed_aggregations": ["<agg1>"],
-  "data_quality_notes": "<brief note about null rate, cardinality, or data issues>",
-  "business_owner_hint": "<suggested team or role that owns this field>",
-  "confidence_score": <0.0 to 1.0>,
-  "needs_human_review": <true|false>
-}}"""
+  "field_name": "string",
+  "friendly_name": "string",
+  "business_definition": "string",
+  "synonyms": ["string"],
+  "default_aggregation": "sum | average | count | count_distinct | none | null",
+  "disallowed_aggregations": ["string"],
+  "data_quality_notes": ["string"],
+  "business_owner_hint": "string or null",
+  "confidence_score": 0.0,
+  "needs_human_review": true
+}}
 
-    def _parse_response(self, raw_text: str, field_name: str) -> Optional[LLMFieldMetadata]:
-        """Extract JSON from the response and validate it with Pydantic."""
-        text = raw_text.strip()
+Rules:
+- confidence_score must be between 0 and 1.
+- Use needs_human_review=true when the field meaning, aggregation, or business use is uncertain.
+- For identifiers, default_aggregation should usually be null or count_distinct.
+- For dates and dimensions, default_aggregation should usually be null.
+- For additive numeric metrics, default_aggregation can be sum.
+- For rates, percentages, averages, and ratios, default_aggregation should usually be average and sum should be disallowed.
+- Keep the output concise and business-readable.
 
-        # Strip markdown code fences if present
-        if text.startswith("```"):
-            lines = text.splitlines()
-            text = "\n".join(
-                line for line in lines
-                if not line.strip().startswith("```")
-            ).strip()
+Grounding context:
+{json.dumps(grounding_context, indent=2, default=str)}
+""".strip()
 
-        # Find the first { ... } block
-        start = text.find("{")
-        end = text.rfind("}") + 1
-        if start == -1 or end == 0:
-            logger.debug("No JSON object found in Gemini response for field '%s'", field_name)
-            return None
+    def _extract_json(self, text: str) -> Optional[Dict[str, Any]]:
+        """Extract a JSON object from model output."""
+        cleaned = text.strip()
 
-        json_str = text[start:end]
-
-        try:
-            data = json.loads(json_str)
-        except json.JSONDecodeError as exc:
-            logger.debug("JSON decode error for field '%s': %s", field_name, exc)
-            return None
-
-        # Ensure field_name matches to prevent hallucinated field names
-        data["field_name"] = field_name
+        if cleaned.startswith("```"):
+            cleaned = re.sub(r"^```(?:json)?", "", cleaned, flags=re.IGNORECASE).strip()
+            cleaned = re.sub(r"```$", "", cleaned).strip()
 
         try:
-            return LLMFieldMetadata(**data)
-        except ValidationError as exc:
-            logger.debug("Pydantic validation failed for field '%s': %s", field_name, exc)
+            return json.loads(cleaned)
+        except json.JSONDecodeError:
+            pass
+
+        match = re.search(r"\{.*\}", cleaned, flags=re.DOTALL)
+        if not match:
+            return None
+
+        try:
+            return json.loads(match.group(0))
+        except json.JSONDecodeError:
             return None

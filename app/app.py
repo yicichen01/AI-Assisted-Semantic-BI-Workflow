@@ -493,8 +493,8 @@ def render_semantic_metadata_agent(results: Optional[Dict[str, Any]]):
     st.markdown(
         """
         The semantic metadata layer recommends how each field should be interpreted by a
-        natural-language BI system. In the upgraded design, this section will support
-        optional Gemini-assisted generation with rule-based fallback.
+        natural-language BI system. Rule-based generation is available by default,
+        and Gemini-assisted enrichment can be enabled with a private API key.
         """
     )
 
@@ -513,19 +513,21 @@ def render_semantic_metadata_agent(results: Optional[Dict[str, Any]]):
     )
     st.session_state["semantic_mode"] = mode
 
-    # Show a small status note for LLM mode without exposing the key
+    # Always re-read the current Gemini key status.
+    # This avoids stale disabled service objects after secrets.toml is added or changed.
     if mode == "LLM-assisted (Gemini)":
-        llm_service: GeminiLLMService = st.session_state.get("llm_service")
-        if llm_service is None:
-            llm_service = GeminiLLMService.from_env()
-            st.session_state["llm_service"] = llm_service
+        llm_service = GeminiLLMService.from_env()
+        st.session_state["llm_service"] = llm_service
 
         if llm_service.is_available():
             st.success("Gemini API key detected. LLM-assisted mode is active.", icon="✅")
         else:
             st.info(
-                "No Gemini API key found. Add GEMINI_API_KEY to `.streamlit/secrets.toml` "
-                "or set it as an environment variable. Rule-based output will be used.",
+                "LLM-assisted mode is available as an optional bring-your-own-key feature. "
+                "This public demo does not include a hosted Gemini API key to prevent unintended API usage. "
+                "To try Gemini enrichment locally, clone the repo, create a Gemini API key in Google AI Studio, "
+                "and add it to `.streamlit/secrets.toml` as `GEMINI_API_KEY`. "
+                "For this hosted demo, the app will safely use rule-based fallback.",
                 icon="ℹ️",
             )
 
@@ -1279,14 +1281,14 @@ if st.session_state.get("selected_domain") != selected_domain:
 
 if run_button:
     with st.spinner("Running semantic BI workflow..."):
-        # Resolve LLM service based on current mode selection
+        # Resolve LLM service based on current mode selection.
+        # Always re-read from secrets/env to avoid stale disabled service objects.
         selected_mode = st.session_state.get("semantic_mode", "Rule-based")
         active_llm_service = None
+
         if selected_mode == "LLM-assisted (Gemini)":
-            active_llm_service = st.session_state.get("llm_service")
-            if active_llm_service is None:
-                active_llm_service = GeminiLLMService.from_env()
-                st.session_state["llm_service"] = active_llm_service
+            active_llm_service = GeminiLLMService.from_env()
+            st.session_state["llm_service"] = active_llm_service
 
         results = run_pipeline(
             df=df,
