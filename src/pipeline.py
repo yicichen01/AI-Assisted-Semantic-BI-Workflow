@@ -70,7 +70,9 @@ class BIWorkflowPipeline:
                 field_suggestions=field_suggestions,
             )
 
-            promotion_status, promotion_reason = self.promotion_rules.apply(score)
+            promotion_status, promotion_reason, guardrail_category, suggested_fix = (
+                self.promotion_rules.apply(score)
+            )
 
             scored_questions.append(
                 {
@@ -90,6 +92,8 @@ class BIWorkflowPipeline:
                     "scoring_status": score.validation_status.value,
                     "promotion_status": promotion_status.value,
                     "promotion_reason": promotion_reason,
+                    "guardrail_category": guardrail_category,
+                    "suggested_fix": suggested_fix,
                     "deal_breakers": score.deal_breakers,
                     "easy_to_fix_items": score.easy_to_fix_items,
                     "ambiguity_flags": score.ambiguity_flags,

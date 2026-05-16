@@ -59,21 +59,78 @@ def objects_to_df(items: List[Any]) -> pd.DataFrame:
     return pd.DataFrame([to_dict(item) for item in items])
 
 
+ISSUE_TEXT_COLUMNS = {
+    "deal_breakers",
+    "easy_to_fix_items",
+    "ambiguity_flags",
+}
+
+
+def ensure_display_sentence(text: Any) -> str:
+    """Format issue-style display text as a readable sentence."""
+    cleaned = str(text).strip()
+
+    if not cleaned or cleaned.lower() in ["nan", "none", "[]", "{}"]:
+        return ""
+
+    cleaned = cleaned.rstrip(".")
+
+    if cleaned:
+        cleaned = cleaned[0].upper() + cleaned[1:]
+
+    return f"{cleaned}."
+
+
 def format_list_value(value: Any) -> str:
-    """Format lists and dictionaries for compact dataframe display."""
+    """Format issue columns as readable sentences."""
     if isinstance(value, list):
-        cleaned_items = [str(v).strip().rstrip(".") for v in value if str(v).strip()]
-        return "; ".join(cleaned_items)
+        cleaned_items = [
+            ensure_display_sentence(v)
+            for v in value
+            if str(v).strip()
+        ]
+        return "; ".join(item for item in cleaned_items if item)
+
     if isinstance(value, dict):
         return str(value)
+
+    return ensure_display_sentence(value)
+
+
+def format_compact_list_value(value: Any) -> str:
+    """Format non-sentence list columns without adding periods."""
+    if isinstance(value, list):
+        return "; ".join(str(v).strip() for v in value if str(v).strip())
+
+    if isinstance(value, dict):
+        return str(value)
+
+    if value is None:
+        return ""
+
+    return value
+
+
+def format_plain_value(value: Any) -> Any:
+    """Leave normal scalar display values unchanged."""
+    if value is None:
+        return ""
+
     return value
 
 
 def clean_dataframe_for_display(df: pd.DataFrame) -> pd.DataFrame:
     """Make dataframe cells more readable in Streamlit tables."""
     display_df = df.copy()
+
     for col in display_df.columns:
-        display_df[col] = display_df[col].apply(format_list_value)
+        if col in ISSUE_TEXT_COLUMNS:
+            display_df[col] = display_df[col].apply(format_list_value)
+        elif col in ["target_metrics", "target_dimensions", "synonyms", "sample_values"]:
+            display_df[col] = display_df[col].apply(format_compact_list_value)
+        else:
+            display_df[col] = display_df[col].apply(format_plain_value)
+
     return display_df
 
 
@@ -221,11 +278,11 @@ def get_promotion_df(results: Optional[Dict[str, Any]]) -> pd.DataFrame:
 # ---------------------------------------------------------------------------
 # Role simulator helpers
 # ---------------------------------------------------------------------------
-# This is a lightweight demo role simulator — no authentication is required.
+# This is a lightweight demo role simulator - no authentication is required.
 # Roles are selected freely from the sidebar to show how different personas
 # would experience the workflow in a real deployment.
 #
-# OIDC scaffold (disabled — for future deployment only):
+# OIDC scaffold (disabled - for future deployment only):
 # To enable real authentication, set ENABLE_OIDC = True and configure the
 # provider details below. This requires streamlit-oidc or a similar library.
 #
@@ -244,17 +301,19 @@ _ROLES = ["Admin", "BI Developer", "Business Viewer"]
 
 _ROLE_DESCRIPTIONS = {
     "Admin": (
-        "Full access. Can run the pipeline, upload CSVs, use LLM-assisted mode, "
-        "download outputs, and view all pages."
+        "Governance access. Can run the pipeline, upload CSVs, use LLM-assisted mode, "
+        "download outputs, view all pages, and use the Admin Review & Fix Simulator "
+        "for review workflows."
     ),
     "BI Developer": (
-        "Full access. Can run the pipeline, upload CSVs, use LLM-assisted mode, "
-        "download outputs, and view all pages."
+        "Builder access. Can run the pipeline, upload CSVs, use LLM-assisted mode, "
+        "download outputs, and view all pages. Admin review controls are hidden."
     ),
     "Business Viewer": (
         "Read-only access. Can view Business Context, Verified Question Library, "
         "Analytics Dashboard, and Monitoring & Audit Log. "
-        "Cannot run the pipeline, upload data, use LLM mode, or download outputs."
+        "Cannot run the pipeline, upload data, use LLM mode, download outputs, "
+        "or use review controls."
     ),
 }
 
@@ -666,6 +725,13 @@ def render_question_validation(results: Optional[Dict[str, Any]], role: str = "A
         """
     )
 
+    st.info(
+        "Questions are not promoted only because they sound fluent. "
+        "They must be grounded in approved fields and metrics, clear enough for business users, "
+        "and safe to answer from the selected dataset.",
+        icon="ℹ️",
+    )
+
     if not results:
         st.info("Run the pipeline from the sidebar to generate candidate questions and scoring results.")
         return
@@ -725,11 +791,14 @@ def render_question_validation(results: Optional[Dict[str, Any]], role: str = "A
         ascending=[True, False],
     )
 
+    # Include new guardrail columns when present; fall back gracefully if absent
     display_cols = [
         col for col in [
             "promotion_status",
+            "guardrail_category",
             "final_score",
             "question_text",
+            "suggested_fix",
             "promotion_reason",
             "deal_breakers",
             "easy_to_fix_items",
@@ -752,6 +821,185 @@ def render_question_validation(results: Optional[Dict[str, Any]], role: str = "A
             file_name="promotion_results.csv",
             mime="text/csv",
         )
+
+    # ------------------------------------------------------------------
+    # Admin-only review & fix simulator (session-state only, no persistence)
+    # ------------------------------------------------------------------
+    if role == "Admin":
+        st.divider()
+        st.markdown("#### Admin Review & Fix Simulator")
+        st.caption(
+            "This is a session-only review simulator. "
+            "Persistent approval history and audit events will be added in the SQLite/audit phase."
+        )
+
+        review_candidates = promotion_df[
+            promotion_df["promotion_status"].isin(["review", "reject"])
+        ].copy()
+
+        if review_candidates.empty:
+            st.success("No questions currently require admin review.")
+        else:
+            selected_question = st.selectbox(
+                "Select a question to review",
+                options=review_candidates["question_text"].tolist(),
+                key="admin_review_question_select",
+            )
+
+            # Show full context for the selected question
+            row = review_candidates[
+                review_candidates["question_text"] == selected_question
+            ].iloc[0]
+
+            # Reset revised question when Admin selects a different original question.
+            # This prevents the text area from keeping the previous question's text.
+            if st.session_state.get("admin_review_selected_question") != selected_question:
+                st.session_state["admin_review_selected_question"] = selected_question
+                st.session_state["admin_revised_question"] = selected_question
+                st.session_state["admin_reviewer_note"] = ""
+
+            detail_cols = st.columns(3)
+            detail_cols[0].metric("Status", row.get("promotion_status", "-"))
+            detail_cols[1].metric("Score", row.get("final_score", "-"))
+            detail_cols[2].metric(
+                "Guardrail",
+                str(row.get("guardrail_category", "-")).replace("_", " ").title(),
+            )
+
+            st.markdown("**Promotion reason:**")
+            st.caption(str(row.get("promotion_reason", "-")))
+
+            fix_text = str(row.get("suggested_fix", ""))
+            if fix_text:
+                st.markdown("**Suggested fix:**")
+                st.caption(fix_text)
+
+            for label, col in [
+                ("Deal-breakers", "deal_breakers"),
+                ("Easy-to-fix items", "easy_to_fix_items"),
+                ("Ambiguity flags", "ambiguity_flags"),
+            ]:
+                val = row.get(col)
+                if val and str(val) not in ("", "[]", "nan", "None"):
+                    items = val if isinstance(val, list) else [str(val)]
+                    items = [i for i in items if str(i).strip()]
+                    if items:
+                        st.markdown(
+                            f"**{label}:** {'; '.join(ensure_display_sentence(i) for i in items)}"
+                        )
+
+            # Revised question text area
+            revised_question = st.text_area(
+                "Revised question",
+                height=80,
+                key="admin_revised_question",
+                help="Edit the question text before promoting it. The revised version must differ from the original.",
+            )
+
+            reviewer_note = st.text_input(
+                "Reviewer note (optional)",
+                key="admin_reviewer_note",
+                placeholder="e.g. Added time window and replaced unregistered metric.",
+            )
+
+            admin_action = st.radio(
+                "Choose action",
+                options=["Promote revised question", "Keep in review", "Reject original question"],
+                horizontal=True,
+                key="admin_review_action",
+            )
+
+            if st.button("Apply Review Decision", key="admin_review_apply"):
+                if admin_action == "Promote revised question":
+                    if revised_question.strip() == selected_question.strip():
+                        st.warning(
+                            "Please revise the question before promoting it. "
+                            "The original question was not promoted by the guardrail checks."
+                        )
+                    else:
+                        review_log = st.session_state.setdefault("admin_review_log", [])
+                        review_log.append({
+                            "original_question": selected_question,
+                            "revised_question": revised_question.strip(),
+                            "original_status": row.get("promotion_status", ""),
+                            "action": admin_action,
+                            "guardrail_category": row.get("guardrail_category", ""),
+                            "suggested_fix": fix_text,
+                            "reviewer_note": reviewer_note.strip(),
+                        })
+                        st.success(
+                            f"Revised question promoted: _{revised_question.strip()}_"
+                        )
+                else:
+                    review_log = st.session_state.setdefault("admin_review_log", [])
+                    review_log.append({
+                        "original_question": selected_question,
+                        "revised_question": "",
+                        "original_status": row.get("promotion_status", ""),
+                        "action": admin_action,
+                        "guardrail_category": row.get("guardrail_category", ""),
+                        "suggested_fix": fix_text,
+                        "reviewer_note": reviewer_note.strip(),
+                    })
+                    st.success(f"Decision recorded: **{admin_action}**")
+
+            # Show session review log
+            review_log = st.session_state.get("admin_review_log", [])
+            if review_log:
+                st.markdown("##### Session Review Log")
+                log_df = pd.DataFrame(review_log)[
+                    [c for c in [
+                        "action", "original_status", "guardrail_category",
+                        "original_question", "revised_question", "reviewer_note",
+                    ] if c in pd.DataFrame(review_log).columns]
+                ]
+                st.dataframe(log_df, use_container_width=True)
+
+                st.markdown("##### Simulated Review Impact")
+
+                impact_df = pd.DataFrame(review_log)
+
+                promoted_count = int(
+                    (impact_df["action"] == "Promote revised question").sum()
+                )
+                review_count = int(
+                    (impact_df["action"] == "Keep in review").sum()
+                )
+                rejected_count = int(
+                    (impact_df["action"] == "Reject original question").sum()
+                )
+
+                impact_cols = st.columns(3)
+                impact_cols[0].metric("Promoted Revised Questions", promoted_count)
+                impact_cols[1].metric("Kept in Review", review_count)
+                impact_cols[2].metric("Rejected Originals", rejected_count)
+
+                st.caption(
+                    "These session-only decisions do not overwrite the original validation results. "
+                    "Persistent approval history and verified library updates will be added in the SQLite/audit phase."
+                )
+
+                promoted_df = impact_df[
+                    impact_df["action"] == "Promote revised question"
+                ].copy()
+
+                if not promoted_df.empty:
+                    st.markdown("##### Simulated Promoted Questions")
+
+                    promoted_cols = [
+                        col for col in [
+                            "original_question",
+                            "revised_question",
+                            "guardrail_category",
+                            "reviewer_note",
+                        ]
+                        if col in promoted_df.columns
+                    ]
+
+                    st.dataframe(
+                        promoted_df[promoted_cols],
+                        use_container_width=True,
+                    )
 
 
 def render_verified_question_library(results: Optional[Dict[str, Any]], role: str = "Admin"):
@@ -790,12 +1038,13 @@ def render_verified_question_library(results: Optional[Dict[str, Any]], role: st
 
     display_cols = [
         col for col in [
-            "promotion_status",
             "final_score",
             "question_text",
+            "target_metrics",
+            "target_dimensions",
+            "time_grain",
             "promotion_reason",
-            "easy_to_fix_items",
-            "ambiguity_flags",
+            "suggested_fix",
         ]
         if col in verified_df.columns
     ]
@@ -1064,9 +1313,135 @@ def render_analytics_dashboard(results: Optional[Dict[str, Any]], role: str = "A
         st.plotly_chart(fig_scores, use_container_width=True)
 
     # -----------------------------
+    # Guardrail Category Breakdown
+    # -----------------------------
+    if "guardrail_category" in promotion_df.columns:
+        st.markdown("#### Guardrail Category Breakdown")
+        st.caption(
+            "This chart shows the primary guardrail category assigned to each question."
+        )
+
+        guardrail_category_df = (
+            promotion_df["guardrail_category"]
+            .fillna("unknown")
+            .astype(str)
+            .str.replace("_", " ")
+            .str.title()
+            .value_counts()
+            .reset_index()
+        )
+        guardrail_category_df.columns = ["guardrail_category", "question_count"]
+
+        def infer_guardrail_status(label: str) -> str:
+            normalized = str(label).strip().lower().replace(" ", "_")
+
+            if normalized == "verified_ready":
+                return "verified"
+
+            if normalized in {
+                "unsupported_metric",
+                "missing_field",
+                "unsafe_aggregation",
+                "not_answerable_from_dataset",
+            }:
+                return "reject"
+
+            if normalized in {
+                "ambiguous_wording",
+                "unclear_time_window",
+                "weak_business_relevance",
+                "low_operational_actionability",
+            }:
+                return "review"
+
+            return "review"
+
+        guardrail_category_df["status_group"] = guardrail_category_df[
+            "guardrail_category"
+        ].apply(infer_guardrail_status)
+
+        category_chart_max = max(guardrail_category_df["question_count"].max(), 1)
+
+        fig_guardrail_category = px.bar(
+            guardrail_category_df,
+            x="question_count",
+            y="guardrail_category",
+            text="question_count",
+            orientation="h",
+            color="status_group",
+            color_discrete_map={
+                "verified": status_color_map["verified"],
+                "review": status_color_map["review"],
+                "reject": status_color_map["reject"],
+            },
+            labels={
+                "guardrail_category": "Guardrail Category",
+                "question_count": "Number of Questions",
+                "status_group": "Validation Status",
+            },
+        )
+
+        fig_guardrail_category.update_traces(
+            textposition="outside",
+            textfont=dict(size=16, color=amazon_dark),
+            marker_line_width=0,
+            cliponaxis=False,
+            hovertemplate="<b>%{y}</b><br>Questions: %{x}<extra></extra>",
+        )
+
+        fig_guardrail_category.update_layout(
+            height=430,
+            showlegend=True,
+            legend=dict(
+                orientation="h",
+                yanchor="top",
+                y=-0.22,
+                xanchor="center",
+                x=0.43,
+                font=dict(size=15, color=amazon_dark),
+                title=None,
+            ),
+            plot_bgcolor="white",
+            paper_bgcolor="white",
+            margin=dict(l=90, r=40, t=45, b=130),
+            xaxis=dict(
+                title=None,
+                tickfont=tick_font,
+                range=[0, category_chart_max * 1.25],
+                showgrid=True,
+                gridcolor=soft_gray,
+                zeroline=False,
+            ),
+            yaxis=dict(
+                title=None,
+                tickfont=tick_font,
+                categoryorder="total ascending",
+            ),
+            annotations=[
+                dict(
+                    text="Number of Questions",
+                    xref="paper",
+                    yref="paper",
+                    x=0.43,
+                    y=-0.23,
+                    showarrow=False,
+                    font=axis_font,
+                )
+            ],
+            font=chart_font,
+        )
+
+        st.plotly_chart(fig_guardrail_category, use_container_width=True)
+
+    # -----------------------------
     # Guardrail / Review Issue Breakdown
     # -----------------------------
     st.markdown("#### Guardrail and Review Issue Breakdown")
+
+    st.caption(
+        "Each question is counted once using priority-based buckets. "
+        "Deal-breaker issues take priority over easy-to-fix and ambiguity flags."
+    )
 
     def count_issue_items(value: Any) -> int:
         if value is None:
@@ -1090,83 +1465,94 @@ def render_analytics_dashboard(results: Optional[Dict[str, Any]], role: str = "A
     def has_issue(value: Any) -> bool:
         return count_issue_items(value) > 0
 
-    issue_columns = [
-        col for col in [
-            "deal_breakers",
-            "easy_to_fix_items",
-            "ambiguity_flags",
-        ]
-        if col in promotion_df.columns
-    ]
+    for col in ["deal_breakers", "easy_to_fix_items", "ambiguity_flags"]:
+        if col not in promotion_df.columns:
+            promotion_df[col] = None
 
-    if issue_columns:
-        issue_summary = []
+    deal_breaker_mask = promotion_df["deal_breakers"].apply(has_issue)
+    easy_to_fix_mask = promotion_df["easy_to_fix_items"].apply(has_issue)
+    ambiguity_mask = promotion_df["ambiguity_flags"].apply(has_issue)
 
-        for col in issue_columns:
-            issue_summary.append(
-                {
-                    "issue_type": col.replace("_", " ").title(),
-                    "issue_count": int(promotion_df[col].apply(count_issue_items).sum()),
-                }
-            )
+    deal_breaker_count = int(deal_breaker_mask.sum())
 
-        issue_summary_df = pd.DataFrame(issue_summary)
+    easy_to_fix_only_count = int(
+        ((~deal_breaker_mask) & easy_to_fix_mask).sum()
+    )
 
-        fig_issues = px.bar(
-            issue_summary_df,
-            x="issue_count",
-            y="issue_type",
-            orientation="h",
-            text="issue_count",
-            color_discrete_sequence=[soft_gray_bar],
-            labels={
-                "issue_count": "Number of Issues",
-                "issue_type": "Issue Type",
+    ambiguity_only_count = int(
+        ((~deal_breaker_mask) & (~easy_to_fix_mask) & ambiguity_mask).sum()
+    )
+
+    issue_summary_df = pd.DataFrame(
+        [
+            {
+                "issue_bucket": "Deal-breaker questions",
+                "question_count": deal_breaker_count,
             },
-        )
+            {
+                "issue_bucket": "Easy-to-fix only",
+                "question_count": easy_to_fix_only_count,
+            },
+            {
+                "issue_bucket": "Ambiguity only",
+                "question_count": ambiguity_only_count,
+            },
+        ]
+    )
 
-        fig_issues.update_traces(
-            textposition="outside",
-            marker_line_width=0,
-        )
+    issue_chart_max = max(issue_summary_df["question_count"].max(), 1)
 
-        fig_issues.update_layout(
-            height=300,
-            showlegend=False,
-            plot_bgcolor="white",
-            paper_bgcolor="white",
-            margin=dict(l=20, r=70, t=20, b=40),
-            xaxis=dict(
-                showgrid=True,
-                gridcolor=soft_gray,
-                zeroline=False,
-                title=dict(text="Number of Issues", font=axis_font),
-                tickfont=tick_font,
-            ),
-            yaxis=dict(
-                title=None,
-                tickangle=0,
-                tickfont=tick_font,
-            ),
-            font=chart_font,
-        )
+    fig_issues = px.bar(
+        issue_summary_df,
+        x="issue_bucket",
+        y="question_count",
+        text="question_count",
+        color_discrete_sequence=[soft_gray_bar],
+        labels={
+            "issue_bucket": "Issue Bucket",
+            "question_count": "Number of Questions",
+        },
+    )
 
-        st.plotly_chart(fig_issues, use_container_width=True)
-    else:
-        st.info("No detailed guardrail issue columns are available in the current pipeline output.")
+    fig_issues.update_traces(
+        textposition="outside",
+        textfont=dict(size=16, color=amazon_dark),
+        marker_line_width=0,
+        cliponaxis=False,
+        hovertemplate="<b>%{x}</b><br>Questions: %{y}<extra></extra>",
+    )
+
+    fig_issues.update_layout(
+        height=390,
+        showlegend=False,
+        plot_bgcolor="white",
+        paper_bgcolor="white",
+        margin=dict(l=20, r=20, t=45, b=80),
+        xaxis=dict(
+            title=dict(text="Issue Bucket", font=axis_font),
+            tickfont=tick_font,
+            tickangle=0,
+        ),
+        yaxis=dict(
+            range=[0, issue_chart_max * 1.25],
+            showgrid=True,
+            gridcolor=soft_gray,
+            zeroline=False,
+            title=dict(text="Number of Questions", font=axis_font),
+            tickfont=tick_font,
+        ),
+        font=chart_font,
+    )
+
+    st.plotly_chart(fig_issues, use_container_width=True)
 
     # -----------------------------
     # Attention Buckets
     # -----------------------------
     st.markdown("#### Questions Requiring Attention")
 
-    st.markdown(
-        """
-        Questions are separated into review buckets based on the type of issue detected.
-        **Deal-breaker issues are treated as the highest-priority bucket.** If a question has
-        both deal-breaker and easy-to-fix items, it is counted under deal-breakers because
-        blocking issues must be resolved before smaller wording or clarity improvements matter.
-        """
+    st.caption(
+        "Questions below are grouped by the highest-priority issue found during validation."
     )
 
     attention_df = promotion_df[
@@ -1407,8 +1793,10 @@ with st.sidebar:
     )
 
     st.divider()
-    st.caption("Current version: domain packs + rule-based semantic workflow")
-    st.caption("Next upgrades: Gemini API, role simulator, SQLite, audit loop")
+    st.caption(
+        "Demo stack: semantic domain packs, optional Gemini enrichment, role-based workflows, "
+        "guardrail validation, verified question governance, SQLite audit history, and analytics dashboard."
+    )
 
 df, metric_registry, glossary, seed_questions = load_domain_pack(selected_domain)
 
