@@ -24,6 +24,9 @@ env/
 outputs/*
 !outputs/.gitkeep
 
+# SQLite database
+data/
+
 # Test/cache
 .pytest_cache/
 .coverage

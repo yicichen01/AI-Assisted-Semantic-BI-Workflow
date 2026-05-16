@@ -19,6 +19,7 @@ import plotly.express as px
 import streamlit as st
 import streamlit.components.v1 as components
 import yaml
+from zoneinfo import ZoneInfo
 
 # Make imports work when running: streamlit run app/app.py
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -27,9 +28,22 @@ if str(PROJECT_ROOT) not in sys.path:
 
 from src.pipeline import BIWorkflowPipeline
 from services.llm_service import GeminiLLMService
+from services.db_service import (
+    init_db,
+    save_pipeline_run,
+    save_review_decision,
+    log_audit_event,
+    get_recent_runs,
+    get_audit_events,
+    get_review_decisions,
+    get_db_status,
+)
 
 
 DOMAINS_DIR = PROJECT_ROOT / "domains"
+
+# Initialise SQLite on startup. Failure is non-fatal.
+_DB_READY = init_db()
 
 
 def load_yaml(path: Path) -> Dict[str, Any]:
@@ -126,6 +140,8 @@ def clean_dataframe_for_display(df: pd.DataFrame) -> pd.DataFrame:
     for col in display_df.columns:
         if col in ISSUE_TEXT_COLUMNS:
             display_df[col] = display_df[col].apply(format_list_value)
+        elif col in ["created_at", "updated_at"]:
+            display_df[col] = display_df[col].apply(format_timestamp_pt)
         elif col in ["target_metrics", "target_dimensions", "synonyms", "sample_values"]:
             display_df[col] = display_df[col].apply(format_compact_list_value)
         else:
@@ -274,6 +290,27 @@ def get_promotion_df(results: Optional[Dict[str, Any]]) -> pd.DataFrame:
         return pd.DataFrame()
     return pd.DataFrame(results.get("promotion_results", []))
 
+def format_timestamp_pt(value: Any) -> str:
+    """Format UTC timestamp as user-friendly Pacific Time display."""
+    if value is None or str(value).strip() == "":
+        return ""
+
+    try:
+        ts = pd.to_datetime(value, utc=True)
+        ts_pt = ts.tz_convert("America/Los_Angeles")
+        return ts_pt.strftime("%Y-%m-%d %H:%M:%S")
+    except Exception:
+        return str(value)
+
+def format_timestamp_columns(df: pd.DataFrame) -> pd.DataFrame:
+    """Format timestamp columns for display tables."""
+    display_df = df.copy()
+
+    for col in ["created_at", "updated_at"]:
+        if col in display_df.columns:
+            display_df[col] = display_df[col].apply(format_timestamp_pt)
+
+    return display_df
 
 # ---------------------------------------------------------------------------
 # Role simulator helpers
@@ -954,8 +991,7 @@ def render_question_validation(results: Optional[Dict[str, Any]], role: str = "A
                             "The original question was not promoted by the guardrail checks."
                         )
                     else:
-                        review_log = st.session_state.setdefault("admin_review_log", [])
-                        review_log.append({
+                        _decision = {
                             "original_question": selected_question,
                             "revised_question": revised_question.strip(),
                             "original_status": row.get("promotion_status", ""),
@@ -963,13 +999,20 @@ def render_question_validation(results: Optional[Dict[str, Any]], role: str = "A
                             "guardrail_category": row.get("guardrail_category", ""),
                             "suggested_fix": fix_text,
                             "reviewer_note": reviewer_note.strip(),
-                        })
+                        }
+                        review_log = st.session_state.setdefault("admin_review_log", [])
+                        review_log.append(_decision)
+                        save_review_decision(
+                            run_id=st.session_state.get("current_run_id"),
+                            decision=_decision,
+                            role=get_current_role(),
+                            domain_name=st.session_state.get("selected_domain", ""),
+                        )
                         st.success(
                             f"Revised question promoted: _{revised_question.strip()}_"
                         )
                 else:
-                    review_log = st.session_state.setdefault("admin_review_log", [])
-                    review_log.append({
+                    _decision = {
                         "original_question": selected_question,
                         "revised_question": "",
                         "original_status": row.get("promotion_status", ""),
@@ -977,7 +1020,15 @@ def render_question_validation(results: Optional[Dict[str, Any]], role: str = "A
                         "guardrail_category": row.get("guardrail_category", ""),
                         "suggested_fix": fix_text,
                         "reviewer_note": reviewer_note.strip(),
-                    })
+                    }
+                    review_log = st.session_state.setdefault("admin_review_log", [])
+                    review_log.append(_decision)
+                    save_review_decision(
+                        run_id=st.session_state.get("current_run_id"),
+                        decision=_decision,
+                        role=get_current_role(),
+                        domain_name=st.session_state.get("selected_domain", ""),
+                    )
                     st.success(f"Decision recorded: **{admin_action}**")
 
             # Show session review log
@@ -1687,69 +1738,188 @@ def render_analytics_dashboard(results: Optional[Dict[str, Any]], role: str = "A
             use_container_width=True,
         )
 
+    # ------------------------------------------------------------------
+    # Run History (from SQLite)
+    # ------------------------------------------------------------------
+    st.divider()
+    st.markdown("#### Run History")
+
+    recent_runs = get_recent_runs(n=20)
+    if recent_runs:
+        runs_df = pd.DataFrame(recent_runs)
+
+        # Summary table
+        summary_cols = [c for c in [
+            "created_at", "domain_name", "role", "semantic_mode",
+            "generated_questions", "verified_count", "review_count",
+            "reject_count", "average_score",
+        ] if c in runs_df.columns]
+        st.dataframe(runs_df[summary_cols], use_container_width=True)
+
+        # Trend chart: verified / review / reject over time
+        trend_cols = [c for c in ["created_at", "verified_count", "review_count", "reject_count"] if c in runs_df.columns]
+        if len(trend_cols) == 4:
+            trend_df = runs_df[trend_cols].copy()
+            trend_df = trend_df.sort_values("created_at")
+            trend_df["run"] = range(1, len(trend_df) + 1)
+
+            trend_melted = trend_df.melt(
+                id_vars=["run", "created_at"],
+                value_vars=["verified_count", "review_count", "reject_count"],
+                var_name="status",
+                value_name="count",
+            )
+            trend_melted["status"] = trend_melted["status"].str.replace("_count", "").str.title()
+
+            amazon_dark = "#232F3E"
+            status_color_map_trend = {
+                "Verified": "#3BB273",
+                "Review": "#F2B84B",
+                "Reject": "#E75A5A",
+            }
+
+            fig_trend = px.line(
+                trend_melted,
+                x="run",
+                y="count",
+                color="status",
+                color_discrete_map=status_color_map_trend,
+                markers=True,
+                labels={"run": "Run #", "count": "Questions", "status": "Status"},
+            )
+            fig_trend.update_layout(
+                height=320,
+                plot_bgcolor="white",
+                paper_bgcolor="white",
+                margin=dict(l=20, r=20, t=20, b=40),
+                font=dict(size=14, color=amazon_dark),
+                legend=dict(orientation="h", yanchor="bottom", y=-0.3, xanchor="center", x=0.5),
+            )
+            st.plotly_chart(fig_trend, use_container_width=True)
+    else:
+        st.info("No run history available yet. Run the pipeline to start building history.")
+
 
 def render_monitoring_audit_log(results: Optional[Dict[str, Any]], role: str = "Admin"):
     st.header("8. Monitoring & Audit Log")
 
     st.markdown(
         """
-        This section previews the future audit and feedback loop. The current version shows
-        the latest in-session review trail. Phase 5 will add SQLite-backed persistence for
-        semantic metadata, question scores, verified questions, and audit events.
+        This section shows the persisted audit trail for pipeline runs, review decisions,
+        and governance events. Data is stored in a local SQLite database when available.
         """
     )
+
+    st.caption("Timestamps are displayed in Pacific Time (PT); SQLite records are stored in UTC.")
+
+    # Persistence status note
+    db_status = get_db_status()
+    if db_status.get("enabled"):
+        st.success(
+            f"SQLite persistence is enabled locally. "
+            f"Database contains {db_status.get('run_count', 0)} pipeline run(s).",
+            icon="💾",
+        )
+    else:
+        st.warning(
+            "SQLite persistence is unavailable. Showing session-only data.",
+            icon="⚠️",
+        )
 
     if not results:
         if role == "Business Viewer":
             st.info(
                 "No pipeline results are available yet. "
-                "Results are generated by Admin or BI Developer roles. "
-                "Ask your BI team to run the pipeline and share the results.",
+                "Results are generated by Admin or BI Developer roles.",
                 icon="ℹ️",
             )
         else:
             st.info("Run the pipeline from the sidebar to generate review activity.")
-        return
 
-    promotion_df = pd.DataFrame(results["promotion_results"])
+    # ------------------------------------------------------------------
+    # Session review trail (always shown when results exist)
+    # ------------------------------------------------------------------
+    if results:
+        promotion_df = pd.DataFrame(results["promotion_results"])
 
-    if promotion_df.empty:
-        st.warning("No review activity is available.")
-        return
+        if not promotion_df.empty:
+            st.markdown("#### Current Session — Validation Trail")
 
-    st.markdown("#### Latest Review Trail Preview")
+            audit_cols = [
+                col for col in [
+                    "promotion_status",
+                    "guardrail_category",
+                    "final_score",
+                    "question_text",
+                    "promotion_reason",
+                    "suggested_fix",
+                    "deal_breakers",
+                    "easy_to_fix_items",
+                    "ambiguity_flags",
+                ]
+                if col in promotion_df.columns
+            ]
 
-    audit_cols = [
-        col for col in [
-            "promotion_status",
-            "final_score",
-            "question_text",
-            "promotion_reason",
-            "deal_breakers",
-            "easy_to_fix_items",
-            "ambiguity_flags",
+            st.dataframe(
+                clean_dataframe_for_display(promotion_df[audit_cols]),
+                use_container_width=True,
+            )
+
+    # ------------------------------------------------------------------
+    # Persisted audit events
+    # ------------------------------------------------------------------
+    st.markdown("#### Audit Event Log")
+
+    audit_events = get_audit_events(n=50)
+    if audit_events:
+        audit_df = pd.DataFrame(audit_events)
+        display_audit_cols = [
+            c for c in ["created_at", "event_type", "role", "domain_name", "message"]
+            if c in audit_df.columns
         ]
-        if col in promotion_df.columns
-    ]
 
-    st.dataframe(
-        clean_dataframe_for_display(promotion_df[audit_cols]),
-        use_container_width=True,
-    )
+        audit_display_df = audit_df[display_audit_cols].copy()
+        if "created_at" in audit_display_df.columns:
+            audit_display_df["created_at"] = audit_display_df["created_at"].apply(
+                format_timestamp_pt
+            )
 
-    st.markdown("#### Planned Audit Events")
-    st.markdown(
-        """
-        Future audit events will include:
+        st.dataframe(audit_display_df, use_container_width=True)
+    else:
+        st.info("No audit events recorded yet. Run the pipeline to generate the first event.")
 
-        - Metadata generation
-        - Question approval
-        - Question rejection
-        - Question promotion
-        - Reviewer feedback notes
-        - Role-based user actions
-        """
-    )
+    # ------------------------------------------------------------------
+    # Persisted review decisions
+    # ------------------------------------------------------------------
+    st.markdown("#### Review Decisions Log")
+
+    review_decisions = get_review_decisions(run_id=None)  # show all runs
+    if review_decisions:
+        rd_df = pd.DataFrame(review_decisions)
+        display_rd_cols = [
+            c for c in [
+                "created_at",
+                "action",
+                "original_status",
+                "guardrail_category",
+                "original_question",
+                "revised_question",
+                "reviewer_note",
+            ]
+            if c in rd_df.columns
+        ]
+
+        rd_display_df = rd_df[display_rd_cols].copy()
+        if "created_at" in rd_display_df.columns:
+            rd_display_df["created_at"] = rd_display_df["created_at"].apply(
+                format_timestamp_pt
+            )
+
+        st.dataframe(rd_display_df, use_container_width=True)
+    else:
+        st.info(
+            "No review decisions recorded yet. Use the Admin Review & Fix Simulator to log decisions."
+        )
 
 
 st.set_page_config(
@@ -1830,10 +2000,20 @@ with st.sidebar:
     )
 
     st.divider()
-    st.caption(
-        "Demo stack: semantic domain packs, optional Gemini enrichment, role-based workflows, "
-        "guardrail validation, verified question governance, SQLite audit history, and analytics dashboard."
-    )
+    with st.sidebar.expander("Product capabilities", expanded=False):
+        st.markdown(
+            """
+            <ul style="font-size: 15px; line-height: 1.6; padding-left: 1.2rem;">
+                <li>Semantic setup</li>
+                <li>Gemini enrichment</li>
+                <li>Guardrail validation</li>
+                <li>Verified library</li>
+                <li>Role review workflow</li>
+                <li>SQLite audit history</li>
+            </ul>
+            """,
+            unsafe_allow_html=True,
+        )
 
 df, metric_registry, glossary, seed_questions = load_domain_pack(selected_domain)
 
@@ -1863,6 +2043,28 @@ if run_button:
         st.session_state["pipeline_results"] = results
         st.session_state["selected_domain"] = selected_domain
         st.session_state["last_run_mode"] = selected_mode
+
+        # Persist to SQLite (non-fatal if unavailable)
+        _run_id = save_pipeline_run(
+            domain_name=selected_domain,
+            role=selected_role,
+            semantic_mode=selected_mode,
+            max_questions=max_questions,
+            dataset_rows=int(df.shape[0]),
+            dataset_fields=int(df.shape[1]),
+            promotion_results=results.get("promotion_results", []),
+        )
+        if _run_id:
+            st.session_state["current_run_id"] = _run_id
+        else:
+            st.session_state.pop("current_run_id", None)
+
+        # Show persistence status note
+        db_status = get_db_status()
+        if db_status.get("enabled"):
+            st.toast("Run saved to local SQLite database.", icon="💾")
+        else:
+            st.toast("SQLite unavailable — results stored in session only.", icon="⚠️")
 
 results = get_results_for_current_domain(selected_domain)
 
