@@ -2,7 +2,7 @@
 
 A product-style Streamlit app for building governed BI semantic layers, validating natural-language BI questions, and promoting trusted self-service analytics assets.
 
-This project is designed as an end-to-end **AI-assisted BI workflow system**. It helps BI teams move from raw operational datasets and business definitions to semantic metadata, candidate questions, validation decisions, verified question libraries, dashboard-ready outputs, and future audit monitoring.
+This project is designed as an end-to-end **AI-assisted BI workflow system**. It helps BI teams move from raw operational datasets and business definitions to semantic metadata, candidate questions, validation decisions, verified question libraries, dashboard-ready outputs, and audit monitoring.
 
 ## Live Demo
 
@@ -16,7 +16,7 @@ Natural-language BI tools are only as reliable as the semantic layer behind them
 
 **AI-Assisted Semantic BI Workflow** demonstrates how BI teams can operationalize the setup, validation, and governance layer behind natural-language analytics.
 
-The app is being upgraded into a more complete workflow with:
+The app has a complete workflow with:
 
 1. Configurable business domain packs
 2. Dataset profiling and semantic setup suggestions
@@ -30,7 +30,7 @@ The app is being upgraded into a more complete workflow with:
 10. BI readiness dashboard
 11. Monitoring, audit log, and human feedback loop
 
-Instead of treating GenAI as a black-box answer engine, this project focuses on the operating layer that makes AI-powered BI trustworthy: metric definitions, business terminology, grounding checks, scoring logic, role-based review, and auditability.
+Instead of treating GenAI as a black-box answer engine, this product focuses on the operating layer that makes AI-powered BI trustworthy: metric definitions, business terminology, grounding checks, scoring logic, role-based review, and auditability.
 
 ---
 
@@ -58,37 +58,49 @@ This config-driven structure makes the workflow reusable across multiple busines
 
 ## Product Preview
 
-The app is organized as a product-style workflow rather than a one-off notebook. Users can select a domain pack, inspect the dataset, generate semantic metadata, validate candidate BI questions, and review dashboard signals from the sidebar workflow navigation.
+The app is organized as a product-style workflow. It guides users from domain selection and dataset inspection to semantic metadata generation, question validation, human-in-the-loop review, dashboard monitoring, and SQLite-backed audit history.
 
-### Product Overview and Workflow Navigation
+### 1. Workflow Overview
 
-The homepage explains the app purpose, the semantic BI workflow, and the three-step demo flow for reviewers.
+![Workflow Overview](assets/screenshots/01_homepage_overview.png)
 
-![Product Overview and Workflow Navigation](assets/screenshots/01_homepage_overview.png)
+The homepage introduces the end-to-end BI semantic workflow, including domain context, semantic setup, question validation, verified library, dashboard monitoring, and audit history.
 
-### Domain Dataset Selection and CSV Preview
+### 2. Dataset Selection
 
-The public demo uses curated domain packs for the full workflow. Users can also upload a CSV for preview-only field inspection, while the full validation workflow remains grounded in the selected domain pack’s metric registry, glossary, and seed questions.
+![Dataset Selection](assets/screenshots/02_dataset_selection.png)
 
-![Domain Dataset Selection and CSV Preview](assets/screenshots/02_dataset_selection.png)
+Users can choose a business domain pack and inspect the uploaded or sample dataset before running the semantic workflow pipeline.
 
-### Semantic Metadata Agent
-
-The semantic metadata agent profiles raw fields and recommends BI-ready field metadata, including include/exclude decisions, friendly names, field roles, default aggregation logic, synonyms, confidence, and rationale.
+### 3. Semantic Metadata Agent
 
 ![Semantic Metadata Agent](assets/screenshots/03_semantic_metadata_agent.png)
 
-### Question Validation and Promotion Scoring
+The semantic metadata agent recommends how each field should be interpreted by a natural-language BI system, with rule-based generation by default and optional Gemini-assisted enrichment.
 
-Candidate BI questions are generated from domain context and scored before being promoted. The workflow separates questions into `Verified`, `Review`, and `Reject` outcomes based on grounding, clarity, business relevance, and guardrail logic.
+### 4. Question Validation
 
-![Question Validation and Promotion Scoring](assets/screenshots/04_question_validation.png)
+![Question Validation](assets/screenshots/04_question_validation.png)
 
-### BI Readiness Dashboard
+Candidate BI questions are scored and classified into verified, review, or reject outcomes with guardrail categories, concise promotion reasons, and suggested fixes.
 
-The analytics dashboard summarizes validation outcomes, score spread, guardrail issue types, and questions requiring attention. This gives BI owners a quick view of whether the semantic layer is ready for trusted self-service analytics.
+### 5. Admin Review & Fix Simulator
 
-![BI Readiness Dashboard](assets/screenshots/05_analytics_dashboard.png)
+![Admin Review & Fix Simulator](assets/screenshots/05_admin-review-fix-simulator.png)
+
+Admins can review flagged questions, revise question wording, simulate review decisions, and capture session-level review logs before persistent audit storage.
+
+### 6. Analytics Dashboard
+
+![Analytics Dashboard](assets/screenshots/06_analytics_dashboard.png)
+
+The dashboard summarizes validation outcomes, guardrail category distribution, issue buckets, and historical pipeline runs for workflow monitoring.
+
+### 7. Audit Log
+
+![Audit Log](assets/screenshots/07_audit-log.png)
+
+SQLite-backed audit logs persist pipeline runs and review decisions, making the workflow easier to trace and review across sessions.
 
 ---
 
@@ -430,18 +442,6 @@ The upgraded design introduces SQLite-backed storage for semantic metadata, vali
 | Dashboarding | Streamlit charts / Plotly-ready design |
 | AI-Assisted Development | GitHub Copilot, Claude, Kiro |
 | BI Inspiration | Amazon QuickSight Q Topics |
-
----
-
-## Implementation Roadmap
-
-Planned phases include:
-
-- Phase 1: Productized UX
-- Phase 2: Optional Gemini Integration
-- Phase 3: Role-Based Review Workflow
-- Phase 4: Guardrails and Verified Library
-- Phase 5: Persistence, Dashboard, and Audit Loop
 
 ---
 
