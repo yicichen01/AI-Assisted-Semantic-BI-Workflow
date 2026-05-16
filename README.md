@@ -64,7 +64,7 @@ The app is organized as a product-style workflow. It guides users from domain se
 
 ![Workflow Overview](assets/screenshots/01_homepage_overview.png)
 
-The homepage introduces the end-to-end BI semantic workflow, including domain context, semantic setup, question validation, verified library, dashboard monitoring, and audit history.
+The homepage introduces the end-to-end, role-based BI semantic workflow, from domain context and semantic setup to question validation, verified library governance, dashboard monitoring, and audit history.
 
 ### 2. Dataset Selection
 
