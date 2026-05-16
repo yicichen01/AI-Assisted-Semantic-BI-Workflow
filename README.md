@@ -8,6 +8,8 @@ This project is designed as an end-to-end **AI-assisted BI workflow system**. It
 
 **[Try the Streamlit MVP here](https://semantic-bi-workflow.streamlit.app/)**
 
+Note: This app is hosted on Streamlit Community Cloud. If it has gone to sleep due to inactivity, click the wake-up button and wait about a minute for the demo to restart.
+
 ---
 
 ## Product Overview
