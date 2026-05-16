@@ -29,3 +29,5 @@ outputs/*
 .coverage
 htmlcov/
 .streamlit/secrets.toml.local
+
+.streamlit/secrets.toml.local
