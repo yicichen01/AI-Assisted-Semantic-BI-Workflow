@@ -859,12 +859,49 @@ def render_question_validation(results: Optional[Dict[str, Any]], role: str = "A
                 st.session_state["admin_reviewer_note"] = ""
 
             detail_cols = st.columns(3)
-            detail_cols[0].metric("Status", row.get("promotion_status", "-"))
-            detail_cols[1].metric("Score", row.get("final_score", "-"))
-            detail_cols[2].metric(
-                "Guardrail",
-                str(row.get("guardrail_category", "-")).replace("_", " ").title(),
+
+            detail_cols[0].metric(
+                "Status",
+                str(row.get("promotion_status", "-")).title(),
             )
+
+            detail_cols[1].metric(
+                "Score",
+                row.get("final_score", "-"),
+            )
+
+            guardrail_label = (
+                str(row.get("guardrail_category", "-"))
+                .replace("_", " ")
+                .title()
+            )
+
+            with detail_cols[2]:
+                st.markdown(
+                    f"""
+                    <div style="margin-top: 0px;">
+                        <div style="
+                            font-size: 16px;
+                            font-weight: 600;
+                            color: rgba(250, 250, 250, 0.7);
+                            margin-bottom: 8px;
+                            line-height: 1.2;
+                        ">
+                            Guardrail
+                        </div>
+                        <div style="
+                            font-size: 34px;
+                            font-weight: 400;
+                            line-height: 1.1;
+                            color: inherit;
+                            white-space: normal;
+                        ">
+                            {guardrail_label}
+                        </div>
+                    </div>
+                    """,
+                    unsafe_allow_html=True,
+                )
 
             st.markdown("**Promotion reason:**")
             st.caption(str(row.get("promotion_reason", "-")))
